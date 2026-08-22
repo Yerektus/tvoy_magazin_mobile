@@ -1,0 +1,9 @@
+# Правила Flutter плюс одно послабление.
+include: package:flutter_lints/flutter.yaml
+
+linter:
+  rules:
+    # Службы принимают `ApiClient api` и кладут его в приватное `_api`:
+    # инициализирующий параметр потребовал бы назвать аргумент `_api`, а
+    # подчёркивание в имени параметра читается хуже, чем эта строка присваивания.
+    prefer_initializing_formals: false

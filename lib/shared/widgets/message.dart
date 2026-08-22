@@ -8,12 +8,17 @@ class Message extends StatelessWidget {
     required this.title,
     this.note,
     this.onRetry,
+    this.retryLabel = 'Повторить',
   });
 
   final IconData icon;
   final String title;
   final String? note;
   final VoidCallback? onRetry;
+
+  /// Подпись на кнопке. По умолчанию «Повторить» — но не всякое действие
+  /// повтор: с пустой страницы закупов план считают в первый раз.
+  final String retryLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +45,7 @@ class Message extends StatelessWidget {
             ],
             if (onRetry != null) ...[
               const SizedBox(height: 16),
-              OutlinedButton(onPressed: onRetry, child: const Text('Повторить')),
+              OutlinedButton(onPressed: onRetry, child: Text(retryLabel)),
             ],
           ],
         ),

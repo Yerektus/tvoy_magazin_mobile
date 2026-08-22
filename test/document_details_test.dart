@@ -9,6 +9,7 @@ import 'package:tvoy_magazin_mobile/features/umag/services/umag_store.dart';
 import 'package:tvoy_magazin_mobile/shared/services/api_client.dart';
 import 'package:tvoy_magazin_mobile/shared/services/api_exception.dart';
 import 'package:tvoy_magazin_mobile/shared/widgets/app_theme.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 
 /// Подменяет сеть: помнит, что и куда ушло.
 class _FakeApi extends ApiClient {
@@ -44,8 +45,22 @@ class _FakeApi extends ApiClient {
   /// Строки накладной. Удаление выкидывает строку и перенумеровывает
   /// оставшиеся — ровно как сервер.
   List<Map<String, dynamic>> lines = [
-    {'id': 765, 'position': 1, 'name': 'Сырок Чудо', 'quantity': '3.000', 'unit': 'шт', 'total': '1125.00'},
-    {'id': 766, 'position': 2, 'name': 'Каша Агуша', 'quantity': '2.000', 'unit': 'шт', 'total': '750.00'},
+    {
+      'id': 765,
+      'position': 1,
+      'name': 'Сырок Чудо',
+      'quantity': '3.000',
+      'unit': 'шт',
+      'total': '1125.00',
+    },
+    {
+      'id': 766,
+      'position': 2,
+      'name': 'Каша Агуша',
+      'quantity': '2.000',
+      'unit': 'шт',
+      'total': '750.00',
+    },
   ];
 
   @override
@@ -107,17 +122,17 @@ class _FakeApi extends ApiClient {
   }
 
   Map<String, dynamic> _invoice() => <String, dynamic>{
-        'id': 87,
-        'status': status,
-        'supplier': 'ТОО «КАРАВАН»',
-        'supplier_bin': '220340013017',
-        'number': 'KBH0425963',
-        'total': '17086.00',
-        'image': image,
-        'images': images ?? [?image],
-        'umag_supply_id': supplyId,
-        'lines': lines,
-      };
+    'id': 87,
+    'status': status,
+    'supplier': 'ТОО «КАРАВАН»',
+    'supplier_bin': '220340013017',
+    'number': 'KBH0425963',
+    'total': '17086.00',
+    'image': image,
+    'images': images ?? [?image],
+    'umag_supply_id': supplyId,
+    'lines': lines,
+  };
 }
 
 const _item = DocumentItem(
@@ -152,7 +167,9 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('снимка на странице нет — только кнопка, открывающая его', (tester) async {
+  testWidgets('снимка на странице нет — только кнопка, открывающая его', (
+    tester,
+  ) async {
     final api = _FakeApi();
     await pump(tester, api);
 
@@ -178,22 +195,14 @@ void main() {
     expect(total, findsOneWidget);
 
     // Ниже середины экрана — то есть в нижней панели, а не в AppBar.
-    final height = tester.view.physicalSize.height / tester.view.devicePixelRatio;
+    final height =
+        tester.view.physicalSize.height / tester.view.devicePixelRatio;
     expect(tester.getCenter(total).dy, greaterThan(height / 2));
   });
 
-  testWidgets('шапка выше обычной', (tester) async {
-    await pump(tester, _FakeApi());
-
-    // Высоту задаёт тема приложения, поэтому спрашиваем не виджет, а то, что
-    // получилось на экране.
-    expect(
-      tester.getSize(find.byType(AppBar)).height,
-      greaterThan(kToolbarHeight),
-    );
-  });
-
-  testWidgets('пока накладная разбирается, страница перечитывает себя', (tester) async {
+  testWidgets('пока накладная разбирается, страница перечитывает себя', (
+    tester,
+  ) async {
     final api = _FakeApi(status: 'processing');
 
     await tester.pumpWidget(
@@ -269,15 +278,17 @@ void main() {
     expect(find.text('Черновик в UMAG'), findsOneWidget);
   });
 
-  testWidgets('перераспознанная, но отправленная зовёт в кабинет, а не на проверку',
-      (tester) async {
-    // Разбор сбросил статус на «Готово», но черновик в UMAG уже есть: заводить
-    // второй нельзя, поэтому и отмечать заново незачем.
-    await pump(tester, _FakeApi(status: 'done', supplyId: 999));
+  testWidgets(
+    'перераспознанная, но отправленная зовёт в кабинет, а не на проверку',
+    (tester) async {
+      // Разбор сбросил статус на «Готово», но черновик в UMAG уже есть: заводить
+      // второй нельзя, поэтому и отмечать заново незачем.
+      await pump(tester, _FakeApi(status: 'done', supplyId: 999));
 
-    expect(find.text('Проверено'), findsNothing);
-    expect(find.text('Черновик в UMAG'), findsOneWidget);
-  });
+      expect(find.text('Проверено'), findsNothing);
+      expect(find.text('Черновик в UMAG'), findsOneWidget);
+    },
+  );
 
   testWidgets('на отправленной есть ссылка на черновик', (tester) async {
     await pump(tester, _FakeApi(supplyId: 999));
@@ -285,13 +296,13 @@ void main() {
     expect(find.text('№999'), findsOneWidget);
     // Иконка «наружу» стоит дважды: в самой строке и на кнопке внизу. Строка
     // говорит, какой это черновик, кнопка — открывает его, не листая страницу.
-    expect(find.byIcon(Icons.open_in_new), findsNWidgets(2));
+    expect(find.byIcon(LucideIcons.external_link), findsNWidgets(2));
   });
 
   testWidgets('пока накладная не отправлена, ссылки нет', (tester) async {
     await pump(tester, _FakeApi());
 
-    expect(find.byIcon(Icons.open_in_new), findsNothing);
+    expect(find.byIcon(LucideIcons.external_link), findsNothing);
   });
 
   testWidgets('пока идёт разбор, действий не предлагаем', (tester) async {
@@ -316,11 +327,13 @@ void main() {
     await tester.pump();
   });
 
-  testWidgets('отказ от повторного разбора ничего не отправляет', (tester) async {
+  testWidgets('отказ от повторного разбора ничего не отправляет', (
+    tester,
+  ) async {
     final api = _FakeApi();
     await pump(tester, api);
 
-    await tester.tap(find.byIcon(Icons.document_scanner_outlined));
+    await tester.tap(find.byIcon(LucideIcons.scan_text));
     await tester.pumpAndSettle();
 
     expect(find.text('Распознать заново?'), findsOneWidget);
@@ -335,7 +348,7 @@ void main() {
     final api = _FakeApi();
     await pump(tester, api);
 
-    await tester.tap(find.byIcon(Icons.document_scanner_outlined));
+    await tester.tap(find.byIcon(LucideIcons.scan_text));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Распознать'));
     await tester.pumpAndSettle();
@@ -405,7 +418,9 @@ void main() {
     expect(find.text('Сырок Чудо'), findsOneWidget);
   });
 
-  testWidgets('во время удаления кнопка действия остаётся на месте', (tester) async {
+  testWidgets('во время удаления кнопка действия остаётся на месте', (
+    tester,
+  ) async {
     // Сервер отвечает не сразу — иначе состояния «идёт удаление» не застать, и
     // проверка ничего не проверяет.
     final api = _FakeApi(status: 'done')..delay = const Duration(seconds: 1);
@@ -421,13 +436,23 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
-    expect(find.text('Проверено'), findsOneWidget, reason: 'кнопка пропала на время удаления');
-    expect(tester.getTopLeft(find.text('Проверено')), before, reason: 'кнопка сдвинулась');
+    expect(
+      find.text('Проверено'),
+      findsOneWidget,
+      reason: 'кнопка пропала на время удаления',
+    );
+    expect(
+      tester.getTopLeft(find.text('Проверено')),
+      before,
+      reason: 'кнопка сдвинулась',
+    );
 
     await tester.pumpAndSettle();
   });
 
-  testWidgets('ссылка на черновик не строится, пока магазины не приехали', (tester) async {
+  testWidgets('ссылка на черновик не строится, пока магазины не приехали', (
+    tester,
+  ) async {
     // Кабинет не читали заранее — так бывает, если боковое меню ни разу не
     // открывали. Раньше в адрес уходил запасной «первый магазин», и человек
     // попадал в чужую приёмку.
@@ -446,29 +471,50 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(umag.account.stores, isEmpty, reason: 'подготовка: список должен быть пуст');
+    expect(
+      umag.account.stores,
+      isEmpty,
+      reason: 'подготовка: список должен быть пуст',
+    );
 
     await tester.tap(find.text('Черновик в UMAG'));
     await tester.pumpAndSettle();
 
     // Прежде чем собирать адрес, страница спросила кабинет.
-    expect(api.umagAsked, greaterThan(0), reason: 'список магазинов не запросили');
+    expect(
+      api.umagAsked,
+      greaterThan(0),
+      reason: 'список магазинов не запросили',
+    );
     expect(umag.account.stores.length, 3);
-    expect(storeIndexOf(umag.account.stores, 17797), 2, reason: 'магазин не тот');
+    expect(
+      storeIndexOf(umag.account.stores, 17797),
+      2,
+      reason: 'магазин не тот',
+    );
   });
 
   testWidgets('справочные значения прижаты к правому краю', (tester) async {
     await pump(tester, _FakeApi());
 
-    final screen = tester.view.physicalSize.width / tester.view.devicePixelRatio;
+    final screen =
+        tester.view.physicalSize.width / tester.view.devicePixelRatio;
 
     // Номер и дата — подписи слева разной длины, значения должны кончаться на
     // одной вертикали, а не начинаться лесенкой.
     final number = tester.getBottomRight(find.text('KBH0425963'));
     final status = tester.getBottomRight(find.text('Проверено'));
 
-    expect(number.dx, closeTo(status.dx, 1), reason: 'значения не выстроены по правому краю');
-    expect(number.dx, greaterThan(screen / 2), reason: 'значения остались слева');
+    expect(
+      number.dx,
+      closeTo(status.dx, 1),
+      reason: 'значения не выстроены по правому краю',
+    );
+    expect(
+      number.dx,
+      greaterThan(screen / 2),
+      reason: 'значения остались слева',
+    );
   });
 
   testWidgets('общую информацию можно свернуть и развернуть', (tester) async {
@@ -497,7 +543,9 @@ void main() {
     expect(find.text('ПОСТАВЩИК'), findsOneWidget);
   });
 
-  testWidgets('свёрнутая информация освобождает место позициям', (tester) async {
+  testWidgets('свёрнутая информация освобождает место позициям', (
+    tester,
+  ) async {
     await pump(tester, _FakeApi());
 
     final before = tester.getTopLeft(find.text('ПОЗИЦИИ')).dy;
@@ -514,7 +562,9 @@ void main() {
     expect(lines - toggle, lessThan(48), reason: 'осталась пустая дыра');
   });
 
-  testWidgets('накладную из двух листов листают в просмотрщике', (tester) async {
+  testWidgets('накладную из двух листов листают в просмотрщике', (
+    tester,
+  ) async {
     await pump(
       tester,
       _FakeApi(

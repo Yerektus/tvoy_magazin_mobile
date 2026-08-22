@@ -2,10 +2,8 @@
 class Organization {
   const Organization({required this.id, required this.name});
 
-  factory Organization.fromJson(Map<String, dynamic> json) => Organization(
-        id: json['id'] as int,
-        name: (json['name'] ?? '') as String,
-      );
+  factory Organization.fromJson(Map<String, dynamic> json) =>
+      Organization(id: json['id'] as int, name: (json['name'] ?? '') as String);
 
   final int id;
   final String name;
@@ -25,18 +23,18 @@ class AuthUser {
   });
 
   factory AuthUser.fromJson(Map<String, dynamic> json) => AuthUser(
-        id: json['id'] as int,
-        email: (json['email'] ?? '') as String,
-        name: (json['name'] ?? '') as String,
-        role: Role.values.firstWhere(
-          (role) => role.name == json['role'],
-          orElse: () => Role.manager,
-        ),
-        organization: Organization.fromJson(
-          Map<String, dynamic>.from(json['organization'] as Map),
-        ),
-        managesOrganization: (json['manages_organization'] ?? false) as bool,
-      );
+    id: json['id'] as int,
+    email: (json['email'] ?? '') as String,
+    name: (json['name'] ?? '') as String,
+    role: Role.values.firstWhere(
+      (role) => role.name == json['role'],
+      orElse: () => Role.manager,
+    ),
+    organization: Organization.fromJson(
+      Map<String, dynamic>.from(json['organization'] as Map),
+    ),
+    managesOrganization: (json['manages_organization'] ?? false) as bool,
+  );
 
   final int id;
   final String email;
@@ -48,11 +46,11 @@ class AuthUser {
   final bool managesOrganization;
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'email': email,
-        'name': name,
-        'role': role.name,
-        'organization': {'id': organization.id, 'name': organization.name},
-        'manages_organization': managesOrganization,
-      };
+    'id': id,
+    'email': email,
+    'name': name,
+    'role': role.name,
+    'organization': {'id': organization.id, 'name': organization.name},
+    'manages_organization': managesOrganization,
+  };
 }

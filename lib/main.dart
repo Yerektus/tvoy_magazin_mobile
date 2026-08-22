@@ -3,8 +3,9 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'features/auth/pages/login_page.dart';
 import 'features/auth/services/auth.dart';
-import 'features/documents/pages/documents_page.dart';
 import 'features/documents/services/documents_store.dart';
+import 'features/home_page.dart';
+import 'features/purchases/services/plan_store.dart';
 import 'features/umag/services/umag_store.dart';
 import 'shared/services/api_client.dart';
 import 'shared/widgets/app_theme.dart';
@@ -16,25 +17,29 @@ void main() {
     App(
       auth: Auth(api: api),
       store: DocumentsStore(api: api),
+      plans: PlanStore(api: api),
       umag: UmagAccountStore(api: api),
     ),
   );
 }
 
-/// Точка сборки: держит службы и решает, какой экран показать.
+/// Точка сборки: держит службы и решает, показывать вход или приложение.
 ///
-/// Роутера тут нет намеренно — экрана всего два, и выбор между ними целиком
-/// определяется тем, есть ли вход. Появится третий — придёт и Navigator.
+/// Роутера тут нет намеренно: снаружи выбор один — вошли или нет. Разделы
+/// внутри приложения переключает [HomePage], и стопки навигации им не нужно —
+/// они равноправны.
 class App extends StatefulWidget {
   const App({
     super.key,
     required this.auth,
     required this.store,
+    required this.plans,
     required this.umag,
   });
 
   final Auth auth;
   final DocumentsStore store;
+  final PlanStore plans;
   final UmagAccountStore umag;
 
   @override
@@ -91,9 +96,10 @@ class _AppState extends State<App> {
       return LoginPage(auth: widget.auth);
     }
 
-    return DocumentsPage(
+    return HomePage(
       auth: widget.auth,
-      store: widget.store,
+      documents: widget.store,
+      plans: widget.plans,
       umag: widget.umag,
     );
   }

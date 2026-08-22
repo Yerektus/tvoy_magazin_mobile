@@ -34,30 +34,36 @@ class _FakeApi extends ApiClient {
   }
 
   Map<String, dynamic> _account({int storeId = 17797}) => <String, dynamic>{
-        'connected': true,
-        'store_id': storeId,
-        'store_name': 'Магазин $storeId',
-        'stores': [
-          for (var i = 0; i < stores; i++)
-            {'id': 17797 + i, 'name': 'Магазин ${17797 + i}'},
-        ],
-      };
+    'connected': true,
+    'store_id': storeId,
+    'store_name': 'Магазин $storeId',
+    'stores': [
+      for (var i = 0; i < stores; i++)
+        {'id': 17797 + i, 'name': 'Магазин ${17797 + i}'},
+    ],
+  };
 
   Map<String, dynamic> _user() => <String, dynamic>{
-        'id': 1,
-        'email': 'shop@tvoymagazin.kz',
-        'name': 'Ержан',
-        'role': 'owner',
-        'organization': {'id': 1, 'name': 'ТОО «Твой магазин»'},
-        'manages_organization': true,
-      };
+    'id': 1,
+    'email': 'shop@tvoymagazin.kz',
+    'name': 'Ержан',
+    'role': 'owner',
+    'organization': {'id': 1, 'name': 'ТОО «Твой магазин»'},
+    'manages_organization': true,
+  };
 }
 
 void main() {
+  /// Раздел, выбранный в меню, — за ним и следим.
+  Section? chosen;
+
   // Без заглушки `SharedPreferences` уходит спрашивать платформу, которой в
   // тестах нет, и ожидание не заканчивается никогда.
   TestWidgetsFlutterBinding.ensureInitialized();
-  setUp(() => SharedPreferences.setMockInitialValues({}));
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+    chosen = null;
+  });
 
   Future<(_FakeApi, Auth)> pump(WidgetTester tester, {int stores = 2}) async {
     final api = _FakeApi(stores: stores);
@@ -67,7 +73,12 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          drawer: AppDrawer(auth: auth, umag: UmagAccountStore(api: api)),
+          drawer: AppDrawer(
+            auth: auth,
+            umag: UmagAccountStore(api: api),
+            current: Section.documents,
+            onSelect: (section) => chosen = section,
+          ),
           body: const SizedBox(),
         ),
       ),
@@ -94,7 +105,9 @@ void main() {
     expect(find.text('ТОО «Твой магазин»'), findsNothing);
   });
 
-  testWidgets('выход спрятан в меню профиля, а не лежит на виду', (tester) async {
+  testWidgets('выход спрятан в меню профиля, а не лежит на виду', (
+    tester,
+  ) async {
     final (_, auth) = await pump(tester);
 
     // Сразу «Выйти» на экране нет — сначала нужно открыть меню.
@@ -133,7 +146,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(api.patches, [
-      {'store_id': 17798}
+      {'store_id': 17798},
     ]);
   });
 
@@ -141,5 +154,38 @@ void main() {
     await pump(tester, stores: 1);
 
     expect(find.byType(DropdownButtonFormField<int>), findsNothing);
+  });
+
+  testWidgets('в меню два раздела, открытый отмечен', (tester) async {
+    await pump(tester);
+
+    expect(find.text('Документы'), findsOneWidget);
+    expect(find.text('Закупки'), findsOneWidget);
+  });
+
+  testWidgets('выбор раздела уходит наверх и закрывает меню', (tester) async {
+    await pump(tester);
+
+    await tester.tap(find.text('Закупки'));
+    await tester.pumpAndSettle();
+
+    expect(chosen, Section.purchases);
+    expect(
+      find.text('Закупки'),
+      findsNothing,
+      reason: 'меню осталось открытым',
+    );
+  });
+
+  testWidgets('тап по открытому разделу только закрывает меню', (tester) async {
+    await pump(tester);
+
+    await tester.tap(find.text('Документы'));
+    await tester.pumpAndSettle();
+
+    // Никуда не переходим, но и меню не оставляем открытым: иначе тап
+    // выглядит как «не сработало».
+    expect(chosen, isNull);
+    expect(find.text('Документы'), findsNothing);
   });
 }

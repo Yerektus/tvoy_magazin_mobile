@@ -42,7 +42,7 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   url_launcher: ^6.3.2
-
+  flutter_lucide: ^1.33.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

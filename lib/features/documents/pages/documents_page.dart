@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 
 import '../../../shared/services/api_exception.dart';
 import '../../../shared/widgets/app_theme.dart';
 import '../../../shared/widgets/error_dialog.dart';
-import '../../../shared/widgets/app_drawer.dart';
 import '../../../shared/widgets/message.dart';
-import '../../auth/services/auth.dart';
 import '../../umag/services/umag_store.dart';
 import '../models/document.dart';
 import '../models/shot.dart';
@@ -19,14 +18,16 @@ import 'document_details_page.dart';
 class DocumentsPage extends StatefulWidget {
   const DocumentsPage({
     super.key,
-    required this.auth,
     required this.store,
     required this.umag,
+    required this.drawer,
   });
 
-  final Auth auth;
   final DocumentsStore store;
   final UmagAccountStore umag;
+
+  /// Меню приходит снаружи: оно одно на все разделы и знает, какой открыт.
+  final Widget drawer;
 
   @override
   State<DocumentsPage> createState() => _DocumentsPageState();
@@ -172,9 +173,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
     final store = widget.store;
 
     return Scaffold(
-      // Выход переехал в боковое меню: в шапке ему было слишком легко попасть
-      // под палец, а рядом с ним теперь стоит и выбор магазина.
-      drawer: AppDrawer(auth: widget.auth, umag: widget.umag),
+      drawer: widget.drawer,
       appBar: AppBar(title: const Text('Документы')),
       body: Stack(
         children: [
@@ -227,7 +226,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
     if (store.error != null) {
       return _scrollable(
         Message(
-          icon: Icons.cloud_off,
+          icon: LucideIcons.cloud_off,
           title: 'Не удалось загрузить',
           note: store.error,
           onRetry: store.load,
@@ -237,10 +236,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
 
     if (store.items.isEmpty) {
       return _scrollable(
-        const Message(
-          icon: Icons.description_outlined,
-          title: 'Накладных пока нет',
-        ),
+        const Message(icon: LucideIcons.file_text, title: 'Накладных пока нет'),
       );
     }
 
@@ -387,14 +383,14 @@ class _Tab extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
         alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 9),
         decoration: BoxDecoration(
           border: Border(
             bottom: BorderSide(
               // Прозрачная полоса у невыбранных, а не отсутствие полосы: иначе
               // высота вкладок отличалась бы на два пикселя и текст дёргался
               // при переключении.
-              color: selected ? turquoiseDark : Colors.transparent,
+              color: selected ? accentDark : Colors.transparent,
               width: 2,
             ),
           ),
@@ -407,8 +403,8 @@ class _Tab extends StatelessWidget {
             label,
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 15,
-              color: selected ? turquoiseDark : const Color(0xFF737373),
+              fontSize: 14,
+              color: selected ? accentDark : const Color(0xFF737373),
               fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
             ),
           ),
@@ -486,15 +482,32 @@ class _DocumentTile extends StatelessWidget {
                     ),
                   ),
                 ),
-                Icon(
-                  document.status.icon,
-                  size: 14,
-                  color: document.status.color,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  document.status.label,
-                  style: TextStyle(fontSize: 12, color: document.status.color),
+                // Плашкой, а не просто цветным текстом: строк в списке много,
+                // и глаз ищет статус по форме быстрее, чем по оттенку букв.
+                Container(
+                  decoration: BoxDecoration(
+                    color: document.status.background,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  padding: const EdgeInsets.fromLTRB(6, 3, 8, 3),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        document.status.icon,
+                        size: 13,
+                        color: document.status.color,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        document.status.label,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: document.status.color,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -546,13 +559,13 @@ class _AddFab extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     _DialAction(
-                      icon: Icons.photo_camera_outlined,
+                      icon: LucideIcons.camera,
                       label: 'Сделать снимок',
                       onTap: onCamera,
                     ),
                     const SizedBox(height: 12),
                     _DialAction(
-                      icon: Icons.photo_library_outlined,
+                      icon: LucideIcons.images,
                       label: 'Выбрать из галереи',
                       onTap: onGallery,
                     ),
@@ -576,7 +589,7 @@ class _AddFab extends StatelessWidget {
               : AnimatedRotation(
                   duration: const Duration(milliseconds: 180),
                   turns: open ? 0.125 : 0,
-                  child: const Icon(Icons.add),
+                  child: const Icon(LucideIcons.plus),
                 ),
         ),
       ],

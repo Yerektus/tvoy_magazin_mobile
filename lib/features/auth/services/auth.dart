@@ -14,8 +14,8 @@ import 'token_storage.dart';
 /// первый протухает, второй меняется на новую пару.
 class Auth extends ChangeNotifier {
   Auth({required ApiClient api, TokenStorage? storage})
-      : _api = api,
-        _storage = storage ?? TokenStorage() {
+    : _api = api,
+      _storage = storage ?? TokenStorage() {
     _api.bind(token: () => _access, refresh: _exchange);
   }
 
@@ -59,16 +59,16 @@ class Auth extends ChangeNotifier {
   }
 
   Future<void> signIn(String email, String password) async {
-    final body = await _api.post('/auth/login/', {
-      'email': email.trim(),
-      'password': password,
-    }) as Map<String, dynamic>;
+    final body =
+        await _api.post('/auth/login/', {
+              'email': email.trim(),
+              'password': password,
+            })
+            as Map<String, dynamic>;
 
     _access = body['access'] as String;
     _refresh = body['refresh'] as String;
-    _user = AuthUser.fromJson(
-      Map<String, dynamic>.from(body['user'] as Map),
-    );
+    _user = AuthUser.fromJson(Map<String, dynamic>.from(body['user'] as Map));
 
     await _storage.saveTokens(_access!, _refresh!);
     await _storage.saveUser(_user!);
@@ -116,8 +116,9 @@ class Auth extends ChangeNotifier {
     }
 
     try {
-      final body = await _api.post('/auth/refresh/', {'refresh': refresh})
-          as Map<String, dynamic>;
+      final body =
+          await _api.post('/auth/refresh/', {'refresh': refresh})
+              as Map<String, dynamic>;
 
       _access = body['access'] as String;
       // Сервер поворачивает refresh при каждом обмене; на всякий случай

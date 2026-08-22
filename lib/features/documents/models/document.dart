@@ -1,23 +1,43 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 
 /// Статусы разбора накладной на бэкенде.
 enum DocumentStatus {
-  pending('В очереди', Icons.schedule, Color(0xFF737373)),
-  processing('Распознаётся', Icons.autorenew, Color(0xFF0284C7)),
-  done('Готово', Icons.check_circle_outline, Color(0xFF059669)),
-  checked('Проверено', Icons.verified_outlined, Color(0xFF059669)),
-  failed('Ошибка', Icons.error_outline, Color(0xFFDC2626));
+  pending('В очереди', LucideIcons.clock, Color(0xFF525252), Color(0xFFF5F5F5)),
+  processing(
+    'Распознаётся',
+    LucideIcons.refresh_cw,
+    Color(0xFF0284C7),
+    Color(0xFFE0F2FE),
+  ),
+  done('Готово', LucideIcons.circle_check, Color(0xFF047857), Color(0xFFD1FAE5)),
+  checked(
+    'Проверено',
+    LucideIcons.badge_check,
+    Color(0xFF047857),
+    Color(0xFFD1FAE5),
+  ),
+  failed(
+    'Ошибка',
+    LucideIcons.circle_alert,
+    Color(0xFFB91C1C),
+    Color(0xFFFEE2E2),
+  );
 
-  const DocumentStatus(this.label, this.icon, this.color);
+  const DocumentStatus(this.label, this.icon, this.color, this.background);
 
   final String label;
   final IconData icon;
   final Color color;
 
+  /// Подложка под статусом в списке. Буквы на ней темнее, чем были на белом:
+  /// на цветном фоне светлый текст теряет контраст.
+  final Color background;
+
   static DocumentStatus parse(String? raw) => values.firstWhere(
-        (status) => status.name == raw,
-        orElse: () => DocumentStatus.pending,
-      );
+    (status) => status.name == raw,
+    orElse: () => DocumentStatus.pending,
+  );
 }
 
 /// Накладная в списке. Полей ровно столько, сколько показывает список: карточку
@@ -35,16 +55,16 @@ class DocumentItem {
   });
 
   factory DocumentItem.fromJson(Map<String, dynamic> json) => DocumentItem(
-        id: json['id'] as int,
-        status: DocumentStatus.parse(json['status'] as String?),
-        supplier: (json['supplier'] ?? '') as String,
-        number: (json['number'] ?? '') as String,
-        issuedAt: _date(json['issued_at'] as String?),
-        // Деньги приходят строкой: у DecimalField нет точного двойника в JSON.
-        total: _decimal(json['total'] as String?),
-        linesCount: (json['lines_count'] ?? 0) as int,
-        createdAt: _date(json['created_at'] as String?),
-      );
+    id: json['id'] as int,
+    status: DocumentStatus.parse(json['status'] as String?),
+    supplier: (json['supplier'] ?? '') as String,
+    number: (json['number'] ?? '') as String,
+    issuedAt: _date(json['issued_at'] as String?),
+    // Деньги приходят строкой: у DecimalField нет точного двойника в JSON.
+    total: _decimal(json['total'] as String?),
+    linesCount: (json['lines_count'] ?? 0) as int,
+    createdAt: _date(json['created_at'] as String?),
+  );
 
   final int id;
   final DocumentStatus status;
@@ -71,7 +91,8 @@ class DocumentItem {
   static DateTime? _date(String? raw) =>
       raw == null ? null : DateTime.tryParse(raw)?.toLocal();
 
-  static double? _decimal(String? raw) => raw == null ? null : double.tryParse(raw);
+  static double? _decimal(String? raw) =>
+      raw == null ? null : double.tryParse(raw);
 }
 
 /// Количество без лишних нулей: «1.000» → «1», «8.290» → «8.29».
@@ -80,7 +101,8 @@ class DocumentItem {
 /// От [formatQuantity] отличается пустотой вместо «—»: в поле правят то, что
 /// потом уйдёт на сервер, и прочерк там значил бы, что человеку надо сначала
 /// стереть тире, а если не сотрёт — отправить его как число.
-String numberForInput(double? value) => value == null ? '' : formatQuantity(value);
+String numberForInput(double? value) =>
+    value == null ? '' : formatQuantity(value);
 
 String formatQuantity(double? quantity) {
   if (quantity == null) {
@@ -88,9 +110,7 @@ String formatQuantity(double? quantity) {
   }
 
   final text = quantity.toStringAsFixed(3);
-  return text.contains('.')
-      ? text.replaceFirst(RegExp(r'\.?0+$'), '')
-      : text;
+  return text.contains('.') ? text.replaceFirst(RegExp(r'\.?0+$'), '') : text;
 }
 
 String formatDate(DateTime date) =>
@@ -189,17 +209,17 @@ class DocumentLine {
   });
 
   factory DocumentLine.fromJson(Map<String, dynamic> json) => DocumentLine(
-        id: json['id'] as int,
-        position: (json['position'] ?? 0) as int,
-        name: (json['name'] ?? '') as String,
-        barcode: (json['barcode'] ?? '') as String,
-        quantity: _decimal(json['quantity'] as String?),
-        unit: (json['unit'] ?? '') as String,
-        price: _decimal(json['price'] as String?),
-        total: _decimal(json['total'] as String?),
-        umagProductName: (json['umag_product_name'] ?? '') as String,
-        umagConfidence: (json['umag_confidence'] as num?)?.toDouble(),
-      );
+    id: json['id'] as int,
+    position: (json['position'] ?? 0) as int,
+    name: (json['name'] ?? '') as String,
+    barcode: (json['barcode'] ?? '') as String,
+    quantity: _decimal(json['quantity'] as String?),
+    unit: (json['unit'] ?? '') as String,
+    price: _decimal(json['price'] as String?),
+    total: _decimal(json['total'] as String?),
+    umagProductName: (json['umag_product_name'] ?? '') as String,
+    umagConfidence: (json['umag_confidence'] as num?)?.toDouble(),
+  );
 
   final int id;
   final int position;
@@ -218,9 +238,12 @@ class DocumentLine {
 
   /// Штрихкод подставила модель, а не прочитала с бумаги.
   bool get barcodeGuessed =>
-      umagProductName.isNotEmpty && umagConfidence != null && umagConfidence! < 1;
+      umagProductName.isNotEmpty &&
+      umagConfidence != null &&
+      umagConfidence! < 1;
 
-  static double? _decimal(String? raw) => raw == null ? null : double.tryParse(raw);
+  static double? _decimal(String? raw) =>
+      raw == null ? null : double.tryParse(raw);
 }
 
 /// Накладная целиком — то, что показывает детальная страница.
@@ -245,23 +268,25 @@ class DocumentDetail {
   });
 
   factory DocumentDetail.fromJson(Map<String, dynamic> json) => DocumentDetail(
-        item: DocumentItem.fromJson(json),
-        supplierBin: (json['supplier_bin'] ?? '') as String,
-        supplierBinAuto: (json['supplier_bin_auto'] ?? false) as bool,
-        error: (json['error'] ?? '') as String,
-        // Выпрямленный снимок, если он получился, иначе исходный.
-        imageUrl: (json['preview'] ?? json['image']) as String?,
-        imageUrls: ((json['images'] ?? const []) as List).cast<String>(),
-        model: (json['model'] ?? '') as String,
-        cost: DocumentItem._decimal(json['cost'] as String?),
-        checkedByEmail: json['checked_by_email'] as String?,
-        umagSupplyId: json['umag_supply_id'] as int?,
-        umagStoreId: json['umag_store_id'] as int?,
-        umagStoreName: (json['umag_store_name'] ?? '') as String,
-        lines: ((json['lines'] ?? []) as List)
-            .map((row) => DocumentLine.fromJson(Map<String, dynamic>.from(row as Map)))
-            .toList(),
-      );
+    item: DocumentItem.fromJson(json),
+    supplierBin: (json['supplier_bin'] ?? '') as String,
+    supplierBinAuto: (json['supplier_bin_auto'] ?? false) as bool,
+    error: (json['error'] ?? '') as String,
+    // Выпрямленный снимок, если он получился, иначе исходный.
+    imageUrl: (json['preview'] ?? json['image']) as String?,
+    imageUrls: ((json['images'] ?? const []) as List).cast<String>(),
+    model: (json['model'] ?? '') as String,
+    cost: DocumentItem._decimal(json['cost'] as String?),
+    checkedByEmail: json['checked_by_email'] as String?,
+    umagSupplyId: json['umag_supply_id'] as int?,
+    umagStoreId: json['umag_store_id'] as int?,
+    umagStoreName: (json['umag_store_name'] ?? '') as String,
+    lines: ((json['lines'] ?? []) as List)
+        .map(
+          (row) => DocumentLine.fromJson(Map<String, dynamic>.from(row as Map)),
+        )
+        .toList(),
+  );
 
   final DocumentItem item;
   final String supplierBin;
@@ -276,8 +301,7 @@ class DocumentDetail {
   final List<String> imageUrls;
 
   /// Что показывать в просмотрщике: список листов, а если его нет — один снимок.
-  List<String> get photos =>
-      imageUrls.isNotEmpty ? imageUrls : [?imageUrl];
+  List<String> get photos => imageUrls.isNotEmpty ? imageUrls : [?imageUrl];
   final String model;
   final double? cost;
   final String? checkedByEmail;
@@ -299,18 +323,18 @@ class DocumentDetail {
   /// Итог не трогаем: его пересчитывает сервер, и подменять его своей арифметикой
   /// значило бы показать число, которого в базе нет.
   DocumentDetail withoutLine(int lineId) => DocumentDetail(
-        item: item,
-        supplierBin: supplierBin,
-        supplierBinAuto: supplierBinAuto,
-        error: error,
-        imageUrl: imageUrl,
-        imageUrls: imageUrls,
-        model: model,
-        cost: cost,
-        checkedByEmail: checkedByEmail,
-        umagSupplyId: umagSupplyId,
-        umagStoreId: umagStoreId,
-        umagStoreName: umagStoreName,
-        lines: lines.where((line) => line.id != lineId).toList(),
-      );
+    item: item,
+    supplierBin: supplierBin,
+    supplierBinAuto: supplierBinAuto,
+    error: error,
+    imageUrl: imageUrl,
+    imageUrls: imageUrls,
+    model: model,
+    cost: cost,
+    checkedByEmail: checkedByEmail,
+    umagSupplyId: umagSupplyId,
+    umagStoreId: umagStoreId,
+    umagStoreName: umagStoreName,
+    lines: lines.where((line) => line.id != lineId).toList(),
+  );
 }

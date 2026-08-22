@@ -57,8 +57,11 @@ class _LineDetailsPageState extends State<LineDetailsPage> {
     setState(() => _saving = true);
 
     try {
-      final detail =
-          await widget.store.updateLine(widget.invoiceId, _line.id, patch);
+      final detail = await widget.store.updateLine(
+        widget.invoiceId,
+        _line.id,
+        patch,
+      );
       final fresh = detail.lines.where((line) => line.id == _line.id);
 
       if (mounted) {
@@ -126,7 +129,9 @@ class _LineDetailsPageState extends State<LineDetailsPage> {
             _Field(
               label: 'Количество',
               value: numberForInput(_line.quantity),
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               onChanged: (next) => _edit('quantity', next, numeric: true),
             ),
             _Field(
@@ -138,13 +143,17 @@ class _LineDetailsPageState extends State<LineDetailsPage> {
             _Field(
               label: 'Цена',
               value: numberForInput(_line.price),
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               onChanged: (next) => _edit('price', next, numeric: true),
             ),
             _Field(
               label: 'Сумма',
               value: numberForInput(_line.total),
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               onChanged: (next) => _edit('total', next, numeric: true),
             ),
             if (_line.umagProductName.isNotEmpty)

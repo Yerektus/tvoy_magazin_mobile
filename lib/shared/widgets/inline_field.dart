@@ -40,8 +40,9 @@ class InlineField extends StatefulWidget {
 }
 
 class _InlineFieldState extends State<InlineField> {
-  late final TextEditingController _controller =
-      TextEditingController(text: widget.value);
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.value,
+  );
   late final FocusNode _focus = FocusNode()..addListener(_onFocusChanged);
 
   /// Отправка уже идёт. Без этого правка уходила дважды: окно с ошибкой или с
@@ -116,8 +117,10 @@ class _InlineFieldState extends State<InlineField> {
         fillColor: const Color(0xFFF5F5F5),
         hintText: widget.hint,
         hintStyle: const TextStyle(color: Color(0xFFA3A3A3)),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 10,
+          vertical: 10,
+        ),
         border: _border,
         enabledBorder: _border,
         focusedBorder: _border,
@@ -129,7 +132,7 @@ class _InlineFieldState extends State<InlineField> {
   /// Рамки нет, но скругление есть: без него серый прямоугольник смотрится
   /// заплаткой на белом.
   OutlineInputBorder get _border => OutlineInputBorder(
-        borderRadius: BorderRadius.circular(6),
-        borderSide: BorderSide.none,
-      );
+    borderRadius: BorderRadius.circular(6),
+    borderSide: BorderSide.none,
+  );
 }

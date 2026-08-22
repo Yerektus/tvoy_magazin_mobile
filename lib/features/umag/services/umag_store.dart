@@ -46,8 +46,9 @@ class UmagAccountStore extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final body = await _api.patch('/umag/account/', {'store_id': storeId})
-          as Map<String, dynamic>;
+      final body =
+          await _api.patch('/umag/account/', {'store_id': storeId})
+              as Map<String, dynamic>;
       _account = UmagAccount.fromJson(body);
     } finally {
       _busy = false;

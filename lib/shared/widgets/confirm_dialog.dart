@@ -52,17 +52,17 @@ class _Action extends StatelessWidget {
   Widget build(BuildContext context) {
     return switch (Theme.of(context).platform) {
       TargetPlatform.iOS || TargetPlatform.macOS => CupertinoDialogAction(
-          onPressed: onPressed,
-          isDestructiveAction: dangerous,
-          child: Text(label),
-        ),
+        onPressed: onPressed,
+        isDestructiveAction: dangerous,
+        child: Text(label),
+      ),
       _ => TextButton(
-          onPressed: onPressed,
-          child: Text(
-            label,
-            style: dangerous ? const TextStyle(color: Color(0xFFDC2626)) : null,
-          ),
+        onPressed: onPressed,
+        child: Text(
+          label,
+          style: dangerous ? const TextStyle(color: Color(0xFFDC2626)) : null,
         ),
+      ),
     };
   }
 }

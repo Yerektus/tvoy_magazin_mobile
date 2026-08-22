@@ -51,7 +51,9 @@ void main() {
     // нажатий, — поэтому берём именно тот, чей painter и есть наш `_FramePainter`.
     final paint = tester.widget<CustomPaint>(
       find.byWidgetPredicate(
-        (widget) => widget is CustomPaint && widget.painter.runtimeType.toString() == '_FramePainter',
+        (widget) =>
+            widget is CustomPaint &&
+            widget.painter.runtimeType.toString() == '_FramePainter',
       ),
     );
     // ignore: avoid_dynamic_calls
@@ -61,7 +63,9 @@ void main() {
   // Короткие экраны и воспроизводили баг: окно рамки забирало себе почти всю
   // высоту, и кнопка спуска оказывалась под ним, у самого края.
   for (final height in [1920.0, 1200.0, 812.0, 667.0, 600.0]) {
-    testWidgets('на высоте ${height}px окно не заходит под кнопку спуска', (tester) async {
+    testWidgets('на высоте ${height}px окно не заходит под кнопку спуска', (
+      tester,
+    ) async {
       final window = await pumpAndReadWindow(tester, height);
       final controlsTop = tester.getTopLeft(find.byType(CaptureControls)).dy;
 
@@ -78,23 +82,29 @@ void main() {
   // Снятые листы добавляют высоты нижнему блоку — окно рамки должно уступать
   // ей место так же, как уступает самой кнопке спуска.
   for (final height in [1920.0, 812.0, 600.0]) {
-    testWidgets('со снятыми листами на ${height}px окно тоже не заходит под кнопки',
-        (tester) async {
-      final window = await pumpAndReadWindow(tester, height, pages: 2);
-      final controlsTop = tester.getTopLeft(find.byType(CaptureControls)).dy;
+    testWidgets(
+      'со снятыми листами на ${height}px окно тоже не заходит под кнопки',
+      (tester) async {
+        final window = await pumpAndReadWindow(tester, height, pages: 2);
+        final controlsTop = tester.getTopLeft(find.byType(CaptureControls)).dy;
 
-      expect(window.bottom, lessThanOrEqualTo(controlsTop));
-    });
+        expect(window.bottom, lessThanOrEqualTo(controlsTop));
+      },
+    );
   }
 
-  testWidgets('пока ничего не снято, кнопок отправки и отмены нет', (tester) async {
+  testWidgets('пока ничего не снято, кнопок отправки и отмены нет', (
+    tester,
+  ) async {
     await pumpAndReadWindow(tester, 812);
 
     expect(find.text('Готово'), findsNothing);
     expect(find.text('Убрать'), findsNothing);
   });
 
-  testWidgets('после первого кадра появляются счётчик и отправка', (tester) async {
+  testWidgets('после первого кадра появляются счётчик и отправка', (
+    tester,
+  ) async {
     await pumpAndReadWindow(tester, 812, pages: 1);
 
     expect(find.text('Снят 1 лист'), findsOneWidget);

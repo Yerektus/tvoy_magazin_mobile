@@ -2,10 +2,8 @@
 class UmagStore {
   const UmagStore({required this.id, required this.name});
 
-  factory UmagStore.fromJson(Map<String, dynamic> json) => UmagStore(
-        id: json['id'] as int,
-        name: (json['name'] ?? '') as String,
-      );
+  factory UmagStore.fromJson(Map<String, dynamic> json) =>
+      UmagStore(id: json['id'] as int, name: (json['name'] ?? '') as String);
 
   final int id;
   final String name;
@@ -24,13 +22,13 @@ class UmagAccount {
   });
 
   factory UmagAccount.fromJson(Map<String, dynamic> json) => UmagAccount(
-        connected: (json['connected'] ?? false) as bool,
-        storeId: json['store_id'] as int?,
-        storeName: (json['store_name'] ?? '') as String,
-        stores: ((json['stores'] ?? const []) as List)
-            .map((row) => UmagStore.fromJson(Map<String, dynamic>.from(row as Map)))
-            .toList(),
-      );
+    connected: (json['connected'] ?? false) as bool,
+    storeId: json['store_id'] as int?,
+    storeName: (json['store_name'] ?? '') as String,
+    stores: ((json['stores'] ?? const []) as List)
+        .map((row) => UmagStore.fromJson(Map<String, dynamic>.from(row as Map)))
+        .toList(),
+  );
 
   static const empty = UmagAccount(
     connected: false,

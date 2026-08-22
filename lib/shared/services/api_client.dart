@@ -48,23 +48,24 @@ class ApiClient {
       _send((token) => _http.get(_uri(path, query), headers: _headers(token)));
 
   Future<dynamic> post(String path, Object body) => _send(
-        (token) => _http.post(
-          _uri(path, null),
-          headers: {..._headers(token), 'Content-Type': 'application/json'},
-          body: jsonEncode(body),
-        ),
-      );
+    (token) => _http.post(
+      _uri(path, null),
+      headers: {..._headers(token), 'Content-Type': 'application/json'},
+      body: jsonEncode(body),
+    ),
+  );
 
   Future<dynamic> patch(String path, Object body) => _send(
-        (token) => _http.patch(
-          _uri(path, null),
-          headers: {..._headers(token), 'Content-Type': 'application/json'},
-          body: jsonEncode(body),
-        ),
-      );
+    (token) => _http.patch(
+      _uri(path, null),
+      headers: {..._headers(token), 'Content-Type': 'application/json'},
+      body: jsonEncode(body),
+    ),
+  );
 
-  Future<dynamic> delete(String path) =>
-      _send((token) => _http.delete(_uri(path, null), headers: _headers(token)));
+  Future<dynamic> delete(String path) => _send(
+    (token) => _http.delete(_uri(path, null), headers: _headers(token)),
+  );
 
   /// Отправляет файлы как обычную форму — так их ждёт `POST /api/invoices/`.
   ///
@@ -125,9 +126,9 @@ class ApiClient {
       Uri.parse('$apiBaseUrl$path').replace(queryParameters: query);
 
   Map<String, String> _headers(String? token) => {
-        'Accept': 'application/json',
-        if (token != null) 'Authorization': 'Bearer $token',
-      };
+    'Accept': 'application/json',
+    if (token != null) 'Authorization': 'Bearer $token',
+  };
 
   dynamic _parse(http.Response response) {
     final body = response.bodyBytes.isEmpty

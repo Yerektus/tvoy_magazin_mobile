@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 
 /// Показывает ошибку окном поверх экрана — родным для системы.
 ///
@@ -20,7 +21,11 @@ Future<void> showErrorDialog(
     builder: (context) => AlertDialog.adaptive(
       // Иконку рисует только материальная версия: у Cupertino в шапке окна
       // ничего, кроме заголовка, не предусмотрено — она её просто не берёт.
-      icon: const Icon(Icons.error_outline, color: Color(0xFFDC2626), size: 32),
+      icon: const Icon(
+        LucideIcons.circle_alert,
+        color: Color(0xFFDC2626),
+        size: 32,
+      ),
       title: Text(title, textAlign: TextAlign.center),
       content: Text(message, textAlign: TextAlign.center),
       actions: [_CloseAction(onPressed: () => Navigator.of(context).pop())],
@@ -48,8 +53,10 @@ class _CloseAction extends StatelessWidget {
     const label = Text('Понятно');
 
     return switch (Theme.of(context).platform) {
-      TargetPlatform.iOS || TargetPlatform.macOS =>
-        CupertinoDialogAction(onPressed: onPressed, child: label),
+      TargetPlatform.iOS || TargetPlatform.macOS => CupertinoDialogAction(
+        onPressed: onPressed,
+        child: label,
+      ),
       _ => TextButton(onPressed: onPressed, child: label),
     };
   }

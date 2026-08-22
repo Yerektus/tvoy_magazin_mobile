@@ -11,7 +11,8 @@ Future<void> _open(WidgetTester tester, TargetPlatform platform) async {
       home: Builder(
         builder: (context) => Scaffold(
           body: TextButton(
-            onPressed: () => showErrorDialog(context, message: 'Сервер недоступен'),
+            onPressed: () =>
+                showErrorDialog(context, message: 'Сервер недоступен'),
             child: const Text('открыть'),
           ),
         ),
@@ -30,7 +31,10 @@ void main() {
     expect(find.byType(CupertinoAlertDialog), findsOneWidget);
     // Кнопка тоже должна быть купертиновской: адаптивным бывает само окно, а
     // содержимое ему безразлично.
-    expect(find.widgetWithText(CupertinoDialogAction, 'Понятно'), findsOneWidget);
+    expect(
+      find.widgetWithText(CupertinoDialogAction, 'Понятно'),
+      findsOneWidget,
+    );
     expect(find.widgetWithText(TextButton, 'Понятно'), findsNothing);
     expect(find.text('Сервер недоступен'), findsOneWidget);
   });

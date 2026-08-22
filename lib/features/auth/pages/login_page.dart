@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 
 import '../../../shared/services/api_exception.dart';
 import '../../../shared/widgets/error_dialog.dart';
@@ -70,9 +71,7 @@ class _LoginPageState extends State<LoginPage> {
                   children: [
                     Text(
                       'Добро пожаловать!',
-                      style: Theme.of(context)
-                          .textTheme
-                          .headlineSmall
+                      style: Theme.of(context).textTheme.headlineSmall
                           ?.copyWith(fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(height: 4),
@@ -101,9 +100,11 @@ class _LoginPageState extends State<LoginPage> {
                         suffixIcon: IconButton(
                           onPressed: () => setState(() => _hidden = !_hidden),
                           icon: Icon(
-                            _hidden ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                            _hidden ? LucideIcons.eye : LucideIcons.eye_off,
                           ),
-                          tooltip: _hidden ? 'Показать пароль' : 'Скрыть пароль',
+                          tooltip: _hidden
+                              ? 'Показать пароль'
+                              : 'Скрыть пароль',
                         ),
                       ),
                       validator: (value) =>

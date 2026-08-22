@@ -45,7 +45,9 @@ void main() {
 
   testWidgets('статус накладной виден в списке', (tester) async {
     await tester.pumpWidget(
-      MaterialApp(home: Scaffold(body: Text(DocumentStatus.parse('checked').label))),
+      MaterialApp(
+        home: Scaffold(body: Text(DocumentStatus.parse('checked').label)),
+      ),
     );
 
     expect(find.text('Проверено'), findsOneWidget);

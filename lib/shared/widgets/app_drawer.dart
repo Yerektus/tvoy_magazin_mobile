@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 
 import '../../features/auth/services/auth.dart';
 import '../../features/umag/models/umag_account.dart';
@@ -7,16 +8,34 @@ import '../services/api_exception.dart';
 import 'app_theme.dart';
 import 'error_dialog.dart';
 
+/// Разделы приложения. Порядок тот же, что в веб-кабинете.
+enum Section {
+  documents('Документы', LucideIcons.file_text),
+  purchases('Закупки', LucideIcons.shopping_cart);
+
+  const Section(this.label, this.icon);
+
+  final String label;
+  final IconData icon;
+}
+
 /// Боковое меню — то же, что колонка слева в веб-кабинете.
-///
-/// Разделов пока один. Держать ради него целое меню кажется лишним, но выбор
-/// магазина и выход должны где-то жить, а в шапке им тесно: там уже стоит
-/// название страницы. Появятся закупки и остатки — им сюда же.
 class AppDrawer extends StatefulWidget {
-  const AppDrawer({super.key, required this.auth, required this.umag});
+  const AppDrawer({
+    super.key,
+    required this.auth,
+    required this.umag,
+    required this.current,
+    required this.onSelect,
+  });
 
   final Auth auth;
   final UmagAccountStore umag;
+
+  /// Какой раздел открыт сейчас.
+  final Section current;
+
+  final ValueChanged<Section> onSelect;
 
   @override
   State<AppDrawer> createState() => _AppDrawerState();
@@ -82,14 +101,21 @@ class _AppDrawerState extends State<AppDrawer> {
             _Header(onClose: () => Navigator.of(context).pop()),
             const SizedBox(height: 8),
 
-            // Раздел пока один, и он же открыт — поэтому никуда не ведёт, а
-            // только показывает, где мы находимся.
-            _NavItem(
-              icon: Icons.description_outlined,
-              label: 'Документы',
-              selected: true,
-              onTap: () => Navigator.of(context).pop(),
-            ),
+            for (final section in Section.values)
+              _NavItem(
+                icon: section.icon,
+                label: section.label,
+                selected: section == widget.current,
+                onTap: () {
+                  // Меню закрываем всегда, даже если ткнули в открытый раздел:
+                  // иначе тап по нему выглядит как «не сработало».
+                  Navigator.of(context).pop();
+
+                  if (section != widget.current) {
+                    widget.onSelect(section);
+                  }
+                },
+              ),
 
             const Spacer(),
 
@@ -132,7 +158,7 @@ class _Header extends StatelessWidget {
           // нужно догадаться. Кнопка догадки не требует.
           IconButton(
             onPressed: onClose,
-            icon: const Icon(Icons.close, size: 22),
+            icon: const Icon(LucideIcons.x, size: 22),
             color: const Color(0xFF737373),
             tooltip: 'Закрыть меню',
           ),
@@ -161,7 +187,7 @@ class _NavItem extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Material(
-        color: selected ? const Color(0xFFF0FDFA) : Colors.transparent,
+        color: selected ? accentPale : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
         child: InkWell(
           onTap: onTap,
@@ -173,13 +199,13 @@ class _NavItem extends StatelessWidget {
                 Icon(
                   icon,
                   size: 20,
-                  color: selected ? turquoiseDark : const Color(0xFF737373),
+                  color: selected ? accentDark : const Color(0xFF737373),
                 ),
                 const SizedBox(width: 12),
                 Text(
                   label,
                   style: TextStyle(
-                    color: selected ? turquoiseDark : const Color(0xFF404040),
+                    color: selected ? accentDark : const Color(0xFF404040),
                     fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
                   ),
                 ),
@@ -229,8 +255,10 @@ class _StorePicker extends StatelessWidget {
             isExpanded: true,
             decoration: InputDecoration(
               isDense: true,
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 12,
+              ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(6),
                 borderSide: const BorderSide(color: Color(0xFFD4D4D4)),
@@ -240,10 +268,7 @@ class _StorePicker extends StatelessWidget {
               for (final store in stores)
                 DropdownMenuItem<int>(
                   value: store.id,
-                  child: Text(
-                    store.name,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  child: Text(store.name, overflow: TextOverflow.ellipsis),
                 ),
             ],
             onChanged: enabled ? onChanged : null,
@@ -271,7 +296,7 @@ class _AccountRow extends StatelessWidget {
         const PopupMenuItem<void>(
           child: Row(
             children: [
-              Icon(Icons.logout, size: 18, color: Color(0xFFDC2626)),
+              Icon(LucideIcons.log_out, size: 18, color: Color(0xFFDC2626)),
               SizedBox(width: 10),
               Text('Выйти', style: TextStyle(color: Color(0xFFDC2626))),
             ],
@@ -291,7 +316,11 @@ class _AccountRow extends StatelessWidget {
                 style: const TextStyle(fontSize: 14, color: Color(0xFF737373)),
               ),
             ),
-            const Icon(Icons.more_vert, size: 20, color: Color(0xFFA3A3A3)),
+            const Icon(
+              LucideIcons.ellipsis_vertical,
+              size: 20,
+              color: Color(0xFFA3A3A3),
+            ),
           ],
         ),
       ),
@@ -314,13 +343,13 @@ class _Avatar extends StatelessWidget {
       height: 34,
       alignment: Alignment.center,
       decoration: const BoxDecoration(
-        color: Color(0xFFCCFBF1),
+        color: Color(0xFFE0F2FE),
         shape: BoxShape.circle,
       ),
       child: Text(
         letter,
         style: const TextStyle(
-          color: turquoiseDark,
+          color: accentDark,
           fontWeight: FontWeight.w600,
         ),
       ),

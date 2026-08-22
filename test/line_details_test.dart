@@ -85,9 +85,9 @@ void main() {
   /// Поле напротив подписи. Искать по значению нельзя: у количества и цены оно
   /// со временем совпадает, а подпись у каждой строки своя.
   Finder fieldNextTo(String label) => find.descendant(
-        of: find.ancestor(of: find.text(label), matching: find.byType(Row)).first,
-        matching: find.byType(TextField),
-      );
+    of: find.ancestor(of: find.text(label), matching: find.byType(Row)).first,
+    matching: find.byType(TextField),
+  );
 
   /// Печатает в поле и жмёт «Готово» на клавиатуре — так же, как человек.
   Future<void> type(WidgetTester tester, String label, String text) async {
@@ -100,7 +100,10 @@ void main() {
     await pump(tester);
 
     expect(find.text('Позиция 1'), findsOneWidget);
-    expect(find.text('БС-Коктейль мол. чудо 0.2л 2% ваниль БШ'), findsOneWidget);
+    expect(
+      find.text('БС-Коктейль мол. чудо 0.2л 2% ваниль БШ'),
+      findsOneWidget,
+    );
     expect(find.text('4607014822657'), findsOneWidget);
     expect(find.text('шт'), findsOneWidget);
     // Товар UMAG показываем, но править его у нас нельзя: у него поля нет.
@@ -118,7 +121,9 @@ void main() {
     expect(api.patches.first.body, {'quantity': '2'});
   });
 
-  testWidgets('запятую с телефонной клавиатуры переводим в точку', (tester) async {
+  testWidgets('запятую с телефонной клавиатуры переводим в точку', (
+    tester,
+  ) async {
     final api = await pump(tester);
 
     await type(tester, 'Цена', '8,29');
@@ -126,7 +131,9 @@ void main() {
     expect(api.patches.first.body, {'price': '8.29'});
   });
 
-  testWidgets('на не-число ругаемся, на сервер не идём и возвращаем прежнее', (tester) async {
+  testWidgets('на не-число ругаемся, на сервер не идём и возвращаем прежнее', (
+    tester,
+  ) async {
     final api = await pump(tester);
 
     await type(tester, 'Количество', 'много');
@@ -139,7 +146,10 @@ void main() {
     await tester.tap(find.text('Понятно'));
     await tester.pumpAndSettle();
 
-    expect(tester.widget<TextField>(fieldNextTo('Количество')).controller?.text, '1');
+    expect(
+      tester.widget<TextField>(fieldNextTo('Количество')).controller?.text,
+      '1',
+    );
   });
 
   testWidgets('без изменений запросов не шлём', (tester) async {

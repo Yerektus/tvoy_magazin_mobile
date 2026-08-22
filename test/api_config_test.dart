@@ -10,7 +10,10 @@ void main() {
     if (kIsWeb) {
       expect(apiBaseUrl, 'http://127.0.0.1:8000/api');
     } else {
-      expect(apiBaseUrl, 'https://tvoymagazinapi-production.up.railway.app/api');
+      expect(
+        apiBaseUrl,
+        'https://tvoymagazinapi-production.up.railway.app/api',
+      );
     }
   });
 

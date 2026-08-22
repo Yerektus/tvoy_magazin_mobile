@@ -92,8 +92,12 @@ class DocumentsStore extends ChangeNotifier {
   /// читаются с фото хуже всего — их чаще прочего приходится вписывать руками.
   ///
   /// Список после этого перечитываем: имя поставщика видно прямо в строке.
-  Future<DocumentDetail> updateDocument(int id, Map<String, dynamic> patch) async {
-    final body = await _api.patch('/invoices/$id/', patch) as Map<String, dynamic>;
+  Future<DocumentDetail> updateDocument(
+    int id,
+    Map<String, dynamic> patch,
+  ) async {
+    final body =
+        await _api.patch('/invoices/$id/', patch) as Map<String, dynamic>;
     await load();
 
     return DocumentDetail.fromJson(body);
@@ -124,7 +128,9 @@ class DocumentsStore extends ChangeNotifier {
   ///
   /// Ответ приходит сразу, ещё до разбора — со статусом «в очереди».
   Future<DocumentDetail> retry(int id) async {
-    final body = await _api.post('/invoices/$id/retry/', const {}) as Map<String, dynamic>;
+    final body =
+        await _api.post('/invoices/$id/retry/', const {})
+            as Map<String, dynamic>;
     await load();
 
     return DocumentDetail.fromJson(body);
@@ -135,7 +141,9 @@ class DocumentsStore extends ChangeNotifier {
   /// Это подпись человека под тем, что строки сходятся с бумагой. Пока её нет,
   /// сервер не даёт отправить накладную в UMAG — и правильно делает.
   Future<DocumentDetail> check(int id) async {
-    final body = await _api.post('/invoices/$id/check/', const {}) as Map<String, dynamic>;
+    final body =
+        await _api.post('/invoices/$id/check/', const {})
+            as Map<String, dynamic>;
     await load();
 
     return DocumentDetail.fromJson(body);
@@ -146,7 +154,9 @@ class DocumentsStore extends ChangeNotifier {
   /// Возвращает номер приёмки. Дальше её ведёт кабинет: недостающие данные
   /// человек вносит уже там.
   Future<int?> sendToUmag(int id) async {
-    final body = await _api.post('/umag/invoices/$id/', const {}) as Map<String, dynamic>;
+    final body =
+        await _api.post('/umag/invoices/$id/', const {})
+            as Map<String, dynamic>;
 
     return body['supply_id'] as int?;
   }
@@ -168,13 +178,18 @@ class DocumentsStore extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final body = await _api.get(
-        '/invoices/',
-        query: {if (_tab.query != null) 'tab': _tab.query!},
-      ) as Map<String, dynamic>;
+      final body =
+          await _api.get(
+                '/invoices/',
+                query: {if (_tab.query != null) 'tab': _tab.query!},
+              )
+              as Map<String, dynamic>;
 
       _items = (body['results'] as List)
-          .map((row) => DocumentItem.fromJson(Map<String, dynamic>.from(row as Map)))
+          .map(
+            (row) =>
+                DocumentItem.fromJson(Map<String, dynamic>.from(row as Map)),
+          )
           .toList();
     } on ApiException catch (error) {
       _error = error.message;

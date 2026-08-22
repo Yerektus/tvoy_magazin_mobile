@@ -1,5 +1,6 @@
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 
 import '../../../shared/services/api_exception.dart';
 import '../../../shared/widgets/error_dialog.dart';
@@ -70,7 +71,9 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
       // `cameras.first` не гарантированно задняя камера — на части устройств
       // список начинается с фронтальной, и тогда в кадре оказывается лицо, а
       // не накладная.
-      final back = cameras.where((c) => c.lensDirection == CameraLensDirection.back);
+      final back = cameras.where(
+        (c) => c.lensDirection == CameraLensDirection.back,
+      );
 
       final camera = CameraController(
         back.isNotEmpty ? back.first : cameras.first,
@@ -191,7 +194,7 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
   Widget _body() {
     if (_failure != null) {
       return Message(
-        icon: Icons.no_photography_outlined,
+        icon: LucideIcons.camera_off,
         title: _failure!,
         note: 'Без камеры накладную не сфотографировать',
         onRetry: () {
@@ -204,7 +207,9 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
     final camera = _camera;
 
     if (camera == null) {
-      return const Center(child: CircularProgressIndicator(color: Colors.white));
+      return const Center(
+        child: CircularProgressIndicator(color: Colors.white),
+      );
     }
 
     return Stack(
@@ -294,7 +299,7 @@ class CaptureControls extends StatelessWidget {
                 child: pages == 0
                     ? const SizedBox.shrink()
                     : _SideButton(
-                        icon: Icons.undo,
+                        icon: LucideIcons.undo_2,
                         label: 'Убрать',
                         onPressed: busy ? null : onUndo,
                       ),
@@ -304,7 +309,7 @@ class CaptureControls extends StatelessWidget {
                 child: pages == 0
                     ? const SizedBox.shrink()
                     : _SideButton(
-                        icon: Icons.check_circle,
+                        icon: LucideIcons.circle_check_big,
                         label: 'Готово',
                         highlighted: true,
                         onPressed: busy ? null : onSend,
@@ -337,8 +342,8 @@ class _SideButton extends StatelessWidget {
     final color = onPressed == null
         ? Colors.white38
         : highlighted
-            ? const Color(0xFF5EEAD4)
-            : Colors.white;
+        ? const Color(0xFF7DD3FC)
+        : Colors.white;
 
     return TextButton(
       onPressed: onPressed,
@@ -369,18 +374,22 @@ class DocumentFrame extends StatelessWidget {
     // Сверху — шапка со статус-баром и небольшой отступ, снизу — весь блок
     // CaptureControls плюс то, что откусывает безопасная зона телефона.
     final topInset = kToolbarHeight + padding.top + 16;
-    final bottomInset = CaptureControls.height + (padding.bottom < 16 ? 16 : padding.bottom);
+    final bottomInset =
+        CaptureControls.height + (padding.bottom < 16 ? 16 : padding.bottom);
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final visibleHeight =
-            (constraints.maxHeight - topInset - bottomInset).clamp(0.0, constraints.maxHeight);
+        final visibleHeight = (constraints.maxHeight - topInset - bottomInset)
+            .clamp(0.0, constraints.maxHeight);
 
         // Пропорции листа A4, в которые и печатают накладные.
         final width = constraints.maxWidth * 0.86;
         final height = (width * 1.414).clamp(0.0, visibleHeight);
         final window = Rect.fromCenter(
-          center: Offset(constraints.maxWidth / 2, topInset + visibleHeight / 2),
+          center: Offset(
+            constraints.maxWidth / 2,
+            topInset + visibleHeight / 2,
+          ),
           width: width,
           height: height,
         );
@@ -459,7 +468,10 @@ class _ShutterButton extends StatelessWidget {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: Colors.white.withValues(alpha: busy ? 0.4 : 1),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.6), width: 4),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.6),
+            width: 4,
+          ),
         ),
         child: busy
             ? const Padding(

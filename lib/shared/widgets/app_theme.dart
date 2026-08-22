@@ -1,19 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// Бирюзовый — цвет приложения: им красится верхняя панель и кнопки.
+/// Свой цвет приложения — тот же, что в веб-кабинете: там это `sky-500`, и
+/// одно действие не должно быть в двух местах разного цвета.
 ///
-/// Оттенка два, и это не случайность. Панель темнее: на ней лежит мелкий текст
-/// вроде названия организации, и на светлой бирюзе белые буквы читались бы
-/// плохо. Кнопкам мелкий текст не грозит, поэтому им достаётся яркий.
-const Color turquoise = Color(0xFF0D9488);
-const Color turquoiseDark = Color(0xFF0F766E);
+/// Оттенка два. Тёмный достаётся мелкому — подчёркиванию вкладки, подписи
+/// открытого раздела: на белом фоне светлый читается плохо. Крупному вроде
+/// кнопок достаётся яркий.
+const Color accent = Color(0xFF0EA5E9);
+const Color accentDark = Color(0xFF0284C7);
 
-/// Оформление под веб-кабинет: нейтральный фон, бирюзовый акцент, скруглений мало.
+/// Бледный оттенок того же цвета — подложка под выбранным разделом меню.
+const Color accentPale = Color(0xFFF0F9FF);
+
+/// Оформление под веб-кабинет: белая шапка, нейтральный фон, скруглений мало.
 ThemeData buildTheme() {
   final scheme = ColorScheme.fromSeed(
-    seedColor: turquoise,
-    primary: turquoise,
+    seedColor: accent,
+    primary: accent,
     surface: Colors.white,
   );
 
@@ -22,17 +26,20 @@ ThemeData buildTheme() {
     colorScheme: scheme,
     scaffoldBackgroundColor: const Color(0xFFFAFAFA),
     appBarTheme: const AppBarTheme(
-      toolbarHeight: 72,
-      backgroundColor: turquoiseDark,
-      foregroundColor: Colors.white,
+      backgroundColor: Colors.white,
+      foregroundColor: Color(0xFF171717),
       elevation: 0,
       scrolledUnderElevation: 0,
       centerTitle: false,
-      // Панель тёмная — значит часы и батарея наверху должны стать светлыми,
-      // иначе на iOS они сольются с фоном.
+      // Черта под панелью обязательна: она белая, а под ней белые же вкладки
+      // и карточки. Без неё непонятно, где кончается шапка.
+      shape: Border(bottom: BorderSide(color: Color(0xFFE5E5E5))),
+      // Панель светлая — значит часы и батарея наверху должны стать тёмными,
+      // иначе на светлом фоне их не видно.
       systemOverlayStyle: SystemUiOverlayStyle(
-        statusBarBrightness: Brightness.dark,
-        statusBarIconBrightness: Brightness.light,
+        statusBarColor: Colors.transparent,
+        statusBarBrightness: Brightness.light,
+        statusBarIconBrightness: Brightness.dark,
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(

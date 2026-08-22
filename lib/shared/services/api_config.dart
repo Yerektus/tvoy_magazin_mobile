@@ -1,7 +1,8 @@
 import 'package:flutter/foundation.dart';
 
 /// Боевой бэкенд. С телефона приложение ходит сюда.
-const String _production = 'https://tvoymagazinapi-production.up.railway.app/api';
+const String _production =
+    'https://tvoymagazinapi-production.up.railway.app/api';
 
 /// Локальный бэкенд для разработки в браузере.
 const String _local = 'http://127.0.0.1:8000/api';

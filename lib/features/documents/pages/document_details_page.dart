@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 
 import '../../../shared/services/api_exception.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
@@ -389,7 +390,7 @@ class _DocumentDetailsPageState extends State<DocumentDetailsPage> {
         actions: [
           IconButton(
             onPressed: _saving ? null : _retry,
-            icon: const Icon(Icons.document_scanner_outlined),
+            icon: const Icon(LucideIcons.scan_text),
             tooltip: 'Распознать заново',
           ),
           const SizedBox(width: 4),
@@ -437,7 +438,7 @@ class _DocumentDetailsPageState extends State<DocumentDetailsPage> {
         detail.item.status == DocumentStatus.done) {
       return FilledButton.icon(
         onPressed: _check,
-        icon: const Icon(Icons.check, size: 18),
+        icon: const Icon(LucideIcons.check, size: 18),
         label: const Text('Проверено'),
       );
     }
@@ -447,7 +448,7 @@ class _DocumentDetailsPageState extends State<DocumentDetailsPage> {
     if (detail.umagSupplyId != null) {
       return FilledButton.icon(
         onPressed: _openSupply,
-        icon: const Icon(Icons.open_in_new, size: 18),
+        icon: const Icon(LucideIcons.external_link, size: 18),
         label: const Text('Черновик в UMAG'),
       );
     }
@@ -455,7 +456,7 @@ class _DocumentDetailsPageState extends State<DocumentDetailsPage> {
     if (detail.item.status == DocumentStatus.checked) {
       return FilledButton.icon(
         onPressed: _sendToUmag,
-        icon: const Icon(Icons.cloud_upload_outlined, size: 18),
+        icon: const Icon(LucideIcons.cloud_upload, size: 18),
         label: const Text('Загрузить в UMAG'),
       );
     }
@@ -466,7 +467,7 @@ class _DocumentDetailsPageState extends State<DocumentDetailsPage> {
   Widget _body() {
     if (_error != null) {
       return Message(
-        icon: Icons.cloud_off,
+        icon: LucideIcons.cloud_off,
         title: 'Не удалось загрузить',
         note: _error,
         onRetry: _load,
@@ -617,7 +618,7 @@ class _InfoToggle extends StatelessWidget {
                 duration: const Duration(milliseconds: 180),
                 turns: open ? 0.5 : 0,
                 child: const Icon(
-                  Icons.expand_more,
+                  LucideIcons.chevron_down,
                   size: 22,
                   color: Color(0xFF525252),
                 ),
@@ -727,12 +728,12 @@ class _PhotoButton extends StatelessWidget {
             ? const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.photo_outlined, size: 18),
+                  Icon(LucideIcons.image, size: 18),
                   SizedBox(width: 8),
                   Text('Снимок'),
                 ],
               )
-            : const Icon(Icons.photo_outlined, size: 20),
+            : const Icon(LucideIcons.image, size: 20),
       ),
     );
 
@@ -854,7 +855,7 @@ class _Row extends StatelessWidget {
               const Padding(
                 padding: EdgeInsets.only(left: 8),
                 child: Icon(
-                  Icons.open_in_new,
+                  LucideIcons.external_link,
                   size: 16,
                   color: Color(0xFF0284C7),
                 ),
@@ -1001,7 +1002,7 @@ class _DeleteBackground extends StatelessWidget {
       color: const Color(0xFFDC2626),
       alignment: Alignment.centerRight,
       padding: const EdgeInsets.only(right: 24),
-      child: const Icon(Icons.delete_outline, color: Colors.white),
+      child: const Icon(LucideIcons.trash_2, color: Colors.white),
     );
   }
 }
@@ -1087,7 +1088,7 @@ class _LineTile extends StatelessWidget {
             const Padding(
               padding: EdgeInsets.only(left: 4),
               child: Icon(
-                Icons.chevron_right,
+                LucideIcons.chevron_right,
                 size: 20,
                 color: Color(0xFFA3A3A3),
               ),

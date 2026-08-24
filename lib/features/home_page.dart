@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../shared/widgets/app_drawer.dart';
+import 'assistant/pages/assistant_page.dart';
+import 'assistant/services/assistant_store.dart';
 import 'auth/services/auth.dart';
 import 'documents/pages/documents_page.dart';
 import 'documents/services/documents_store.dart';
@@ -19,12 +21,14 @@ class HomePage extends StatefulWidget {
     required this.auth,
     required this.documents,
     required this.plans,
+    required this.chat,
     required this.umag,
   });
 
   final Auth auth;
   final DocumentsStore documents;
   final PlanStore plans;
+  final AssistantStore chat;
   final UmagAccountStore umag;
 
   @override
@@ -50,6 +54,7 @@ class _HomePageState extends State<HomePage> {
         drawer: drawer,
       ),
       Section.purchases => PurchasesPage(store: widget.plans, drawer: drawer),
+      Section.assistant => AssistantPage(store: widget.chat, drawer: drawer),
     };
   }
 }

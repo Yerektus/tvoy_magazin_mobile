@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'features/auth/pages/login_page.dart';
 import 'features/auth/services/auth.dart';
+import 'features/assistant/services/assistant_store.dart';
 import 'features/documents/services/documents_store.dart';
 import 'features/home_page.dart';
 import 'features/purchases/services/plan_store.dart';
@@ -18,6 +19,7 @@ void main() {
       auth: Auth(api: api),
       store: DocumentsStore(api: api),
       plans: PlanStore(api: api),
+      chat: AssistantStore(api: api),
       umag: UmagAccountStore(api: api),
     ),
   );
@@ -34,12 +36,14 @@ class App extends StatefulWidget {
     required this.auth,
     required this.store,
     required this.plans,
+    required this.chat,
     required this.umag,
   });
 
   final Auth auth;
   final DocumentsStore store;
   final PlanStore plans;
+  final AssistantStore chat;
   final UmagAccountStore umag;
 
   @override
@@ -100,6 +104,7 @@ class _AppState extends State<App> {
       auth: widget.auth,
       documents: widget.store,
       plans: widget.plans,
+      chat: widget.chat,
       umag: widget.umag,
     );
   }

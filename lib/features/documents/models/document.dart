@@ -10,7 +10,12 @@ enum DocumentStatus {
     Color(0xFF0284C7),
     Color(0xFFE0F2FE),
   ),
-  done('Готово', LucideIcons.circle_check, Color(0xFF047857), Color(0xFFD1FAE5)),
+  done(
+    'Готово',
+    LucideIcons.circle_check,
+    Color(0xFF047857),
+    Color(0xFFD1FAE5),
+  ),
   checked(
     'Проверено',
     LucideIcons.badge_check,

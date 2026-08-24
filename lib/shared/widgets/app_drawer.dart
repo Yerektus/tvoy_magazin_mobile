@@ -11,7 +11,8 @@ import 'error_dialog.dart';
 /// Разделы приложения. Порядок тот же, что в веб-кабинете.
 enum Section {
   documents('Документы', LucideIcons.file_text),
-  purchases('Закупки', LucideIcons.shopping_cart);
+  purchases('Закупки', LucideIcons.shopping_cart),
+  assistant('Аналитик', LucideIcons.message_square);
 
   const Section(this.label, this.icon);
 
@@ -348,10 +349,7 @@ class _Avatar extends StatelessWidget {
       ),
       child: Text(
         letter,
-        style: const TextStyle(
-          color: accentDark,
-          fontWeight: FontWeight.w600,
-        ),
+        style: const TextStyle(color: accentDark, fontWeight: FontWeight.w600),
       ),
     );
   }

@@ -206,7 +206,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(api.posts, [
-      {'days': 30, 'horizon': 3}
+      {'days': 30, 'horizon': 3},
     ]);
   });
 
@@ -218,12 +218,19 @@ void main() {
 
     expect(find.byType(CupertinoAlertDialog), findsOneWidget);
     // Кнопки тоже: адаптивным бывает само окно, а содержимое ему безразлично.
-    expect(find.widgetWithText(CupertinoDialogAction, 'Посчитать'), findsOneWidget);
+    expect(
+      find.widgetWithText(CupertinoDialogAction, 'Посчитать'),
+      findsOneWidget,
+    );
     expect(find.widgetWithText(TextButton, 'Посчитать'), findsNothing);
   });
 
   testWidgets('на Android окно периода материальное', (tester) async {
-    await pump(tester, _FakeApi(plan: _ready()), platform: TargetPlatform.android);
+    await pump(
+      tester,
+      _FakeApi(plan: _ready()),
+      platform: TargetPlatform.android,
+    );
 
     await tester.tap(find.text('Посчитать заново'));
     await tester.pumpAndSettle();

@@ -223,16 +223,22 @@ void main() {
     await pump(tester);
 
     final tabs = tester.getSize(
-      find.ancestor(
-        of: find.text('Все'),
-        matching: find.byType(AnimatedContainer),
-      ).first,
+      find
+          .ancestor(
+            of: find.text('Все'),
+            matching: find.byType(AnimatedContainer),
+          )
+          .first,
     );
 
     // Вкладки — это управление, а не содержимое: чем меньше они откусывают у
     // списка, тем лучше. Сорок точек хватает, чтобы попасть пальцем.
     expect(tabs.height, lessThanOrEqualTo(42));
-    expect(tabs.height, greaterThanOrEqualTo(36), reason: 'по такой не попасть');
+    expect(
+      tabs.height,
+      greaterThanOrEqualTo(36),
+      reason: 'по такой не попасть',
+    );
   });
 
   testWidgets('статус в списке стоит на своей подложке', (tester) async {
@@ -245,7 +251,10 @@ void main() {
 
     final chip = tester.widget<Container>(
       find
-          .ancestor(of: find.text('Проверено'), matching: find.byType(Container))
+          .ancestor(
+            of: find.text('Проверено'),
+            matching: find.byType(Container),
+          )
           .first,
     );
 

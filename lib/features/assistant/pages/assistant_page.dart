@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import '../../../shared/services/api_exception.dart';
 import '../../../shared/widgets/app_theme.dart';
@@ -164,7 +165,11 @@ class _Empty extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(LucideIcons.message_square, size: 40, color: Color(0xFFA3A3A3)),
+            Icon(
+              LucideIcons.message_square,
+              size: 40,
+              color: Color(0xFFA3A3A3),
+            ),
             SizedBox(height: 12),
             Text(
               'Спросите про магазин',
@@ -178,6 +183,10 @@ class _Empty extends StatelessWidget {
 }
 
 /// Реплика: своя справа на синем, ответ аналитика слева на сером.
+///
+/// Свою реплику показываем как есть: человек пишет вопрос словами, а не
+/// разметкой. Ответ аналитика разбираем как markdown — жирным он выделяет
+/// заголовки разделов и важные числа, тире начинает списки.
 class _Bubble extends StatelessWidget {
   const _Bubble({required this.message});
 
@@ -197,16 +206,54 @@ class _Bubble extends StatelessWidget {
           color: message.mine ? accent : const Color(0xFFF0F0F0),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: SelectableText(
-          message.text,
-          style: TextStyle(
-            color: message.mine ? Colors.white : const Color(0xFF171717),
-            height: 1.4,
-          ),
-        ),
+        child: message.mine
+            ? SelectableText(
+                message.text,
+                style: const TextStyle(color: Colors.white, height: 1.4),
+              )
+            : MarkdownBody(
+                data: message.text,
+                selectable: true,
+                styleSheet: _markdown(context),
+              ),
       ),
     );
   }
+}
+
+/// Как выглядит разметка в ответе аналитика.
+///
+/// Больше жирного, списков и абзацев в ответах и не бывает — так просит
+/// инструкция аналитика. Но если он всё же поставит заголовок или таблицу,
+/// пузырь не должен из-за этого разъехаться: заголовки оставляем размером с
+/// обычную строку, только жирнее.
+MarkdownStyleSheet _markdown(BuildContext context) {
+  const text = TextStyle(color: Color(0xFF171717), height: 1.4);
+  final bold = text.copyWith(fontWeight: FontWeight.w600);
+
+  return MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+    p: text,
+    strong: bold,
+    em: text.copyWith(fontStyle: FontStyle.italic),
+    listBullet: text,
+    a: text.copyWith(color: accent, decoration: TextDecoration.underline),
+    h1: bold,
+    h2: bold,
+    h3: bold,
+    h4: bold,
+    h5: bold,
+    h6: bold,
+    // Отступ между абзацами меньше пустой строки: пузырь и так узкий, а
+    // разделов в ответе бывает много.
+    blockSpacing: 8,
+    listIndent: 16,
+    h1Padding: EdgeInsets.zero,
+    h2Padding: EdgeInsets.zero,
+    h3Padding: EdgeInsets.zero,
+    h4Padding: EdgeInsets.zero,
+    h5Padding: EdgeInsets.zero,
+    h6Padding: EdgeInsets.zero,
+  );
 }
 
 /// Аналитик думает.

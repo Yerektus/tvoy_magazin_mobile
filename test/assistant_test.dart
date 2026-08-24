@@ -58,6 +58,56 @@ class _FakeApi extends ApiClient {
   }
 }
 
+/// Каким стилем отрисован кусок текста на экране.
+///
+/// Проверяем по нему, что разметку разобрали: жирный кусок отличается от
+/// соседних не значками вокруг, а начертанием.
+TextStyle? styleOf(WidgetTester tester, String part) {
+  // Стиль куска собирается по дороге к нему: жирное начертание стоит на
+  // спане-обёртке, а сам текст лежит в его ребёнке.
+  TextStyle? search(InlineSpan span, TextStyle? outer) {
+    final style = outer?.merge(span.style) ?? span.style;
+
+    if (span is! TextSpan) {
+      return null;
+    }
+
+    if ((span.text ?? '').contains(part)) {
+      return style;
+    }
+
+    for (final child in span.children ?? const <InlineSpan>[]) {
+      final found = search(child, style);
+
+      if (found != null) {
+        return found;
+      }
+    }
+
+    return null;
+  }
+
+  // Переписку можно выделять, поэтому реплики рисует не RichText, а поле
+  // выделяемого текста: спаны с их стилями лежат в его контроллере.
+  for (final element in find.byType(EditableText).evaluate()) {
+    final field = element.widget as EditableText;
+    final found = search(
+      field.controller.buildTextSpan(
+        context: element,
+        style: field.style,
+        withComposing: false,
+      ),
+      null,
+    );
+
+    if (found != null) {
+      return found;
+    }
+  }
+
+  return null;
+}
+
 void main() {
   Future<_FakeApi> pump(WidgetTester tester, _FakeApi api) async {
     await tester.pumpWidget(
@@ -98,15 +148,41 @@ void main() {
     expect(find.text('За месяц 60 накладных.'), findsOneWidget);
   });
 
-  testWidgets('ответ показывается целиком, как его прислал сервер', (tester) async {
-    const report = 'Отчёт\n\n- накладных: 60\n- на сумму: 1 094 930 ₸';
+  testWidgets('разметку в ответе разбирают, а не показывают значками', (
+    tester,
+  ) async {
+    const report = '**Накладные**\n\n- пришло 60\n- на сумму 1 094 930 ₸';
     await pump(tester, _FakeApi(answer: report));
 
     await tester.enterText(find.byType(TextField), 'Отчёт');
     await tester.tap(find.byTooltip('Спросить'));
     await tester.pumpAndSettle();
 
-    expect(find.text(report), findsOneWidget);
+    // Звёздочек и тире на экране быть не должно: это разметка, а не текст.
+    expect(find.textContaining('**'), findsNothing);
+    expect(find.textContaining('- пришло'), findsNothing);
+
+    // Сам текст при этом на месте весь, до последней строки.
+    expect(find.textContaining('Накладные'), findsOneWidget);
+    expect(find.textContaining('пришло 60'), findsOneWidget);
+    expect(find.textContaining('на сумму 1 094 930 ₸'), findsOneWidget);
+
+    // И заголовок раздела правда жирный, а не просто строка сверху.
+    expect(styleOf(tester, 'Накладные')?.fontWeight, FontWeight.w600);
+  });
+
+  testWidgets('свой вопрос показывают как есть, разметку в нём не ищут', (
+    tester,
+  ) async {
+    await pump(tester, _FakeApi());
+
+    await tester.enterText(find.byType(TextField), 'Что с **Pepsi**?');
+    await tester.tap(find.byTooltip('Спросить'));
+    await tester.pumpAndSettle();
+
+    // Человек пишет вопрос словами: звёздочки в нём — часть названия, а не
+    // просьба выделить его жирным.
+    expect(find.text('Что с **Pepsi**?'), findsOneWidget);
   });
 
   testWidgets('вопрос видно сразу, не дожидаясь ответа', (tester) async {

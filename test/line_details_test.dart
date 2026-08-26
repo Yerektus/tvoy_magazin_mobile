@@ -57,6 +57,7 @@ const _line = DocumentLine(
   position: 1,
   name: 'БС-Коктейль мол. чудо 0.2л 2% ваниль БШ',
   barcode: '4607014822657',
+  barcodeAuto: false,
   quantity: 1,
   unit: 'шт',
   price: 380,

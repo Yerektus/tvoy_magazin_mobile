@@ -21,15 +21,20 @@ enum Section {
 ///
 /// Раньше разделы жили в боковой шторке — как в веб-кабинете, где слева есть
 /// свободная колонка. На телефоне её нет: до шторки нужно дотянуться до
-/// верхнего угла и сперва догадаться, что она вообще есть. Разделов четыре,
-/// они равноправны, и внизу они видны всегда — и как список, и как указание,
+/// верхнего угла и сперва догадаться, что она вообще есть. Разделы
+/// равноправны, и внизу они видны всегда — и как список, и как указание,
 /// где ты сейчас.
 class AppBottomBar extends StatelessWidget {
   const AppBottomBar({
     super.key,
+    required this.sections,
     required this.current,
     required this.onSelect,
   });
+
+  /// Какие разделы показывать. Не всегда все: закупки и помощник менеджеру
+  /// закрыты, пока доступ не выдали, и панель у него короче.
+  final List<Section> sections;
 
   /// Какой раздел открыт сейчас.
   final Section current;
@@ -50,9 +55,9 @@ class AppBottomBar extends StatelessWidget {
         height: 64,
         indicatorColor: accentPale,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        selectedIndex: Section.values.indexOf(current),
+        selectedIndex: sections.indexOf(current),
         onDestinationSelected: (index) {
-          final section = Section.values[index];
+          final section = sections[index];
 
           // Тап по открытому разделу ничего не меняет: перезапускать страницу
           // и терять набранное в ней незачем.
@@ -61,7 +66,7 @@ class AppBottomBar extends StatelessWidget {
           }
         },
         destinations: [
-          for (final section in Section.values)
+          for (final section in sections)
             NavigationDestination(
               icon: Icon(
                 section.icon,

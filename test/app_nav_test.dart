@@ -8,12 +8,13 @@ void main() {
 
   setUp(() => chosen = null);
 
-  Future<void> pump(WidgetTester tester) async {
+  Future<void> pump(WidgetTester tester, {List<Section>? sections}) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
           appBar: AppBar(title: const Text('Документы')),
           bottomNavigationBar: AppBottomBar(
+            sections: sections ?? Section.values,
             current: Section.documents,
             onSelect: (section) => chosen = section,
           ),
@@ -52,5 +53,16 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(chosen, isNull);
+  });
+
+  testWidgets('закрытых разделов в панели нет вовсе', (tester) async {
+    // Так панель выглядит у менеджера, пока доступ к закупкам и помощнику ему
+    // не выдали: не серые пункты, по которым нельзя нажать, а два раздела.
+    await pump(tester, sections: [Section.documents, Section.settings]);
+
+    expect(find.text('Документы'), findsWidgets);
+    expect(find.text('Настройки'), findsOneWidget);
+    expect(find.text('Закупки'), findsNothing);
+    expect(find.text('Помощник'), findsNothing);
   });
 }

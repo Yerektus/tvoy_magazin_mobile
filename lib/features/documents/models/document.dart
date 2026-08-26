@@ -209,6 +209,7 @@ class DocumentLine {
     required this.position,
     required this.name,
     required this.barcode,
+    required this.barcodeAuto,
     required this.quantity,
     required this.unit,
     required this.price,
@@ -222,6 +223,7 @@ class DocumentLine {
     position: (json['position'] ?? 0) as int,
     name: (json['name'] ?? '') as String,
     barcode: (json['barcode'] ?? '') as String,
+    barcodeAuto: (json['barcode_auto'] ?? false) as bool,
     quantity: _decimal(json['quantity'] as String?),
     unit: (json['unit'] ?? '') as String,
     price: _decimal(json['price'] as String?),
@@ -234,6 +236,12 @@ class DocumentLine {
   final int position;
   final String name;
   final String barcode;
+
+  /// Штрихкод не с бумаги: его подобрали по прошлым накладным — там строка
+  /// называлась так же. Цифру, которой человек на листе не видел, стоит
+  /// сверить, поэтому в карточке она подписана.
+  final bool barcodeAuto;
+
   final double? quantity;
   final String unit;
   final double? price;
@@ -242,14 +250,8 @@ class DocumentLine {
   /// Товар кабинета, с которым сведена строка.
   final String umagProductName;
 
-  /// Единица — штрихкод с бумаги, меньше — его подставила модель.
+  /// Насколько уверенно строка сведена с товаром кабинета.
   final double? umagConfidence;
-
-  /// Штрихкод подставила модель, а не прочитала с бумаги.
-  bool get barcodeGuessed =>
-      umagProductName.isNotEmpty &&
-      umagConfidence != null &&
-      umagConfidence! < 1;
 
   static double? _decimal(String? raw) =>
       raw == null ? null : double.tryParse(raw);

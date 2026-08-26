@@ -40,6 +40,23 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   Section _section = Section.documents;
 
+  /// Разделы, открытые этому человеку.
+  ///
+  /// Закупки и помощник менеджеру закрыты: он принимает товар, а не считает
+  /// закуп и не спрашивает аналитику. Кому нужны — доступ выдают руками в
+  /// админке, и сервер говорит об этом в `/auth/me/`. Правило считаем не по
+  /// роли: оно целиком на той стороне, а здесь только ответ.
+  List<Section> get _sections {
+    final user = widget.auth.user;
+
+    return [
+      Section.documents,
+      if (user?.usesPurchases ?? false) Section.purchases,
+      if (user?.usesAssistant ?? false) Section.assistant,
+      Section.settings,
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     // Под клавиатурой панель прячем. Иначе в «Помощнике» она встаёт полосой
@@ -48,8 +65,14 @@ class _HomePageState extends State<HomePage> {
     // набранного вопроса всё равно никто не станет.
     final typing = MediaQuery.viewInsetsOf(context).bottom > 0;
 
+    final sections = _sections;
+
+    // Доступ могли отобрать, пока раздел был открыт: возвращаемся к тому, что
+    // есть у всех.
+    final current = sections.contains(_section) ? _section : Section.documents;
+
     return Scaffold(
-      body: switch (_section) {
+      body: switch (current) {
         Section.documents => DocumentsPage(
           store: widget.documents,
           umag: widget.umag,
@@ -61,7 +84,8 @@ class _HomePageState extends State<HomePage> {
       bottomNavigationBar: typing
           ? null
           : AppBottomBar(
-              current: _section,
+              sections: sections,
+              current: current,
               onSelect: (section) => setState(() => _section = section),
             ),
     );

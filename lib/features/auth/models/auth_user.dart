@@ -20,6 +20,8 @@ class AuthUser {
     required this.role,
     required this.organization,
     required this.managesOrganization,
+    required this.usesPurchases,
+    required this.usesAssistant,
   });
 
   factory AuthUser.fromJson(Map<String, dynamic> json) => AuthUser(
@@ -34,6 +36,8 @@ class AuthUser {
       Map<String, dynamic>.from(json['organization'] as Map),
     ),
     managesOrganization: (json['manages_organization'] ?? false) as bool,
+    usesPurchases: (json['uses_purchases'] ?? false) as bool,
+    usesAssistant: (json['uses_assistant'] ?? false) as bool,
   );
 
   final int id;
@@ -45,6 +49,13 @@ class AuthUser {
   /// По ней решаем, показывать ли то, чем ведут организацию.
   final bool managesOrganization;
 
+  /// Открыты ли разделы закупок и помощника.
+  ///
+  /// Считает сервер, а не мы по роли: менеджеру их выдают поштучно руками, и
+  /// правило целиком лежит на той стороне.
+  final bool usesPurchases;
+  final bool usesAssistant;
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'email': email,
@@ -52,5 +63,7 @@ class AuthUser {
     'role': role.name,
     'organization': {'id': organization.id, 'name': organization.name},
     'manages_organization': managesOrganization,
+    'uses_purchases': usesPurchases,
+    'uses_assistant': usesAssistant,
   };
 }

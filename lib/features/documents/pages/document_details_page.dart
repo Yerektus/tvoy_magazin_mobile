@@ -58,6 +58,18 @@ class _DocumentDetailsPageState extends State<DocumentDetailsPage> {
   /// поставщика и статус от того, кто ещё не знает, что их можно раскрыть.
   bool _infoOpen = true;
 
+  /// Развёрнут ли список позиций. Тоже раскрыт: ради него карточку и
+  /// открывают — строки сверяют с бумагой.
+  bool _linesOpen = true;
+
+  /// Идёт то самое действие, что стоит под шапкой: отметка проверенной или
+  /// загрузка в UMAG.
+  ///
+  /// Отдельно от `_saving`: тот поднимается и на удалении позиции, и на правке
+  /// поставщика, а к кнопке они отношения не имеют — от их работы она гаснуть
+  /// не должна.
+  bool _acting = false;
+
   /// Пока накладная в разборе, страница перечитывает себя сама: разбор идёт на
   /// сервере и о своём конце знать не даёт, а после «распознать заново» человек
   /// смотрит именно на этот экран и ждёт строк.
@@ -215,7 +227,10 @@ class _DocumentDetailsPageState extends State<DocumentDetailsPage> {
     Future<void> Function() action, {
     required String failure,
   }) async {
-    setState(() => _saving = true);
+    setState(() {
+      _saving = true;
+      _acting = true;
+    });
 
     try {
       await action();
@@ -224,12 +239,18 @@ class _DocumentDetailsPageState extends State<DocumentDetailsPage> {
         // Полоску гасим до окна, а не после: работа кончилась — пусть и
         // неудачей, — а бегущая под сообщением об ошибке лента обещает, что
         // что-то ещё происходит.
-        setState(() => _saving = false);
+        setState(() {
+          _saving = false;
+          _acting = false;
+        });
         await showErrorDialog(context, title: failure, message: error.message);
       }
     } finally {
       if (mounted) {
-        setState(() => _saving = false);
+        setState(() {
+          _saving = false;
+          _acting = false;
+        });
       }
     }
   }
@@ -484,10 +505,9 @@ class _DocumentDetailsPageState extends State<DocumentDetailsPage> {
       return null;
     }
 
-    // На занятость не смотрим намеренно. Раньше кнопка пропадала на время
-    // любой работы — и при удалении позиции тоже, хотя к нему она отношения не
-    // имеет: ряд дёргался, снимок прыгал вправо и обратно. От повторного
-    // нажатия защищаются сами обработчики.
+    // Гаснет кнопка только от своей работы (`_acting`). На чужую — удаление
+    // позиции, правку поставщика — не смотрим: раньше она пропадала на время
+    // любой, ряд дёргался, и снимок прыгал вправо и обратно.
 
     // Порядок важен: уже отправленная накладная перебивает всё остальное — её
     // могли перераспознать, и статус снова стал «Готово», но черновик в
@@ -495,7 +515,7 @@ class _DocumentDetailsPageState extends State<DocumentDetailsPage> {
     if (detail.umagSupplyId == null &&
         detail.item.status == DocumentStatus.done) {
       return FilledButton.icon(
-        onPressed: _check,
+        onPressed: _acting ? null : _check,
         icon: const Icon(LucideIcons.check, size: 18),
         label: const Text('Проверено'),
       );
@@ -513,9 +533,17 @@ class _DocumentDetailsPageState extends State<DocumentDetailsPage> {
 
     if (detail.item.status == DocumentStatus.checked) {
       return FilledButton.icon(
-        onPressed: _sendToUmag,
-        icon: const Icon(LucideIcons.cloud_upload, size: 18),
-        label: const Text('Загрузить в UMAG'),
+        // Пока идёт загрузка, кнопка погашена: черновик в кабинете заводится
+        // секунды, и за это время по ней успевали нажать второй раз.
+        onPressed: _acting ? null : _sendToUmag,
+        icon: _acting
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(LucideIcons.cloud_upload, size: 18),
+        label: Text(_acting ? 'Загружаем…' : 'Загрузить в UMAG'),
       );
     }
 
@@ -541,7 +569,8 @@ class _DocumentDetailsPageState extends State<DocumentDetailsPage> {
     return ListView(
       children: [
         if (detail.error.isNotEmpty) _Failure(text: detail.error),
-        _InfoToggle(
+        _SectionToggle(
+          title: 'Информация',
           open: _infoOpen,
           onTap: () => setState(() => _infoOpen = !_infoOpen),
         ),
@@ -626,12 +655,24 @@ class _DocumentDetailsPageState extends State<DocumentDetailsPage> {
                   ],
                 ),
         ),
-        _Lines(
-          lines: detail.lines,
-          onTap: _openLine,
-          onDelete: _deleteLine,
-          onConfirmDelete: _confirmDelete,
-          onAdd: _saving ? null : _addLine,
+        _SectionToggle(
+          title: 'Позиции',
+          open: _linesOpen,
+          onTap: () => setState(() => _linesOpen = !_linesOpen),
+        ),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          alignment: Alignment.topCenter,
+          child: !_linesOpen
+              ? const SizedBox(width: double.infinity, height: 0)
+              : _Lines(
+                  lines: detail.lines,
+                  onTap: _openLine,
+                  onDelete: _deleteLine,
+                  onConfirmDelete: _confirmDelete,
+                  onAdd: _saving ? null : _addLine,
+                ),
         ),
         const SizedBox(height: 16),
       ],
@@ -639,14 +680,19 @@ class _DocumentDetailsPageState extends State<DocumentDetailsPage> {
   }
 }
 
-/// Переключатель общей информации о накладной.
+/// Переключатель раздела карточки.
 ///
 /// Серой полосой во всю ширину — как заголовки дней в списке: так видно, что
 /// это не подпись к разделу, а по ней можно нажать. Слов «свернуть» и
 /// «развернуть» нет: стрелка говорит то же самое и не спорит с заголовком.
-class _InfoToggle extends StatelessWidget {
-  const _InfoToggle({required this.open, required this.onTap});
+class _SectionToggle extends StatelessWidget {
+  const _SectionToggle({
+    required this.title,
+    required this.open,
+    required this.onTap,
+  });
 
+  final String title;
   final bool open;
   final VoidCallback onTap;
 
@@ -660,12 +706,14 @@ class _InfoToggle extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 10, 12, 10),
           child: Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'ИНФОРМАЦИЯ',
-                  style: TextStyle(
-                    fontSize: 12,
-                    letterSpacing: 0.6,
+                  title,
+                  // Не капсом: разрядка и прописные нужны были друг другу —
+                  // вплотную набранный капс слипается, — а строчным они только
+                  // мешают, и заголовок читается как обычное слово.
+                  style: const TextStyle(
+                    fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF737373),
                   ),
@@ -777,12 +825,10 @@ class _Section extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            title.toUpperCase(),
-            style: const TextStyle(
-              fontSize: 12,
-              letterSpacing: 0.6,
-              color: Color(0xFFA3A3A3),
-            ),
+            title,
+            // Тоже не капсом — как и заголовки разделов выше: иначе на одном
+            // экране половина подписей кричит, а половина нет.
+            style: const TextStyle(fontSize: 13, color: Color(0xFFA3A3A3)),
           ),
           const SizedBox(height: 4),
           ...children,
@@ -964,28 +1010,18 @@ class _Lines extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.fromLTRB(16, 24, 16, 8),
-          child: Text(
-            'ПОЗИЦИИ',
-            style: TextStyle(
-              fontSize: 12,
-              letterSpacing: 0.6,
-              color: Color(0xFFA3A3A3),
-            ),
-          ),
-        ),
-
         if (lines.isEmpty)
           const Padding(
-            padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+            // Сверху воздух: без него строка липнет к серой полосе раздела и
+            // читается как часть её, а не как ответ на вопрос «что внутри».
+            padding: EdgeInsets.fromLTRB(16, 14, 16, 6),
             child: Text(
               'Позиции не распознаны',
               style: TextStyle(color: Color(0xFF737373)),
             ),
           ),
 
-        for (final line in lines)
+        for (final (index, line) in lines.indexed)
           // Ключ по id строки, а не по номеру: после удаления сервер
           // перенумеровывает оставшиеся, и по номеру Flutter принял бы
           // соседнюю строку за только что убранную.
@@ -1010,7 +1046,14 @@ class _Lines extends StatelessWidget {
                 ),
               ],
             ),
-            child: _LineTile(line: line, onTap: () => onTap(line)),
+            child: _LineTile(
+              line: line,
+              // Черта отделяет строки друг от друга. Первой отделяться не от
+              // чего: над ней и так серая полоса раздела, и две линии подряд
+              // читались как пустая рамка.
+              divider: index > 0,
+              onTap: () => onTap(line),
+            ),
           ),
 
         // Модель иногда пропускает строку целиком — дописать её нужно руками.
@@ -1047,9 +1090,17 @@ class _AddLineButton extends StatelessWidget {
 }
 
 class _LineTile extends StatelessWidget {
-  const _LineTile({required this.line, required this.onTap});
+  const _LineTile({
+    required this.line,
+    required this.divider,
+    required this.onTap,
+  });
 
   final DocumentLine line;
+
+  /// Рисовать ли черту сверху. У первой строки её нет.
+  final bool divider;
+
   final VoidCallback onTap;
 
   @override
@@ -1061,7 +1112,11 @@ class _LineTile extends StatelessWidget {
           // Свой фон обязателен: под строкой лежит красная подложка удаления, и
           // сквозь прозрачную она просвечивала бы всегда, а не только на свайпе.
           color: Theme.of(context).scaffoldBackgroundColor,
-          border: const Border(top: BorderSide(color: Color(0xFFF5F5F5))),
+          border: Border(
+            top: BorderSide(
+              color: divider ? const Color(0xFFF5F5F5) : Colors.transparent,
+            ),
+          ),
         ),
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
         child: Row(
@@ -1097,7 +1152,9 @@ class _LineTile extends StatelessWidget {
                         line.barcode,
                         style: TextStyle(
                           fontSize: 12,
-                          color: line.barcodeGuessed
+                          // Подобранный выделяем цветом: его не было на
+                          // бумаге, и глазами по строке он не проверяется.
+                          color: line.barcodeAuto
                               ? const Color(0xFF0284C7)
                               : const Color(0xFF737373),
                         ),

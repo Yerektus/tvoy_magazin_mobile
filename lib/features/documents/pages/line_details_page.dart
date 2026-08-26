@@ -143,7 +143,7 @@ class _LineDetailsPageState extends State<LineDetailsPage> {
               label: 'Штрихкод',
               value: _line.barcode,
               hint: '8–14 цифр',
-              note: _line.barcodeGuessed ? 'подставил ИИ' : null,
+              note: _line.barcodeAuto ? 'из прошлых накладных' : null,
               keyboardType: TextInputType.number,
               onChanged: (next) => _edit('barcode', next, numeric: true),
               // Кнопка внутри поля, а не рядом: она про это самое значение, и

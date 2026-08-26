@@ -86,6 +86,7 @@ class _FakeApi extends ApiClient {
   @override
   Future<dynamic> post(String path, Object body) async {
     posts.add(path);
+    await Future<void>.delayed(delay);
 
     if (path == '/invoices/87/check/') {
       status = 'checked';
@@ -395,6 +396,53 @@ void main() {
     expect(api.posts, ['/invoices/87/retry/']);
   });
 
+  testWidgets('кнопка гаснет на время загрузки в UMAG', (tester) async {
+    // Сервер отвечает не сразу — иначе состояния «идёт загрузка» не застать.
+    final api = _FakeApi(status: 'checked')..delay = const Duration(seconds: 1);
+    await pump(tester, api);
+
+    await tester.tap(find.text('Загрузить в UMAG'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Загрузить').last);
+
+    // Смотрим на середине работы: кнопка должна быть погашена, иначе по ней
+    // успевают нажать второй раз и в кабинете заводится второй черновик.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final button = tester.widget<FilledButton>(
+      find.ancestor(
+        of: find.text('Загружаем…'),
+        matching: find.byType(FilledButton),
+      ),
+    );
+
+    expect(button.onPressed, isNull);
+
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('позиции сворачиваются так же, как информация', (tester) async {
+    await pump(tester, _FakeApi());
+
+    expect(find.text('Сырок Чудо'), findsOneWidget);
+
+    await tester.tap(find.text('Позиции'));
+    await tester.pumpAndSettle();
+
+    // Свёрнутый раздел убираем целиком, а не прячем: иначе под ним остаётся
+    // пустая дыра во весь список.
+    expect(find.text('Сырок Чудо'), findsNothing);
+    expect(find.text('Добавить позицию'), findsNothing);
+    // Сам раздел на месте — его же и разворачивают обратно.
+    expect(find.text('Позиции'), findsOneWidget);
+
+    await tester.tap(find.text('Позиции'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Сырок Чудо'), findsOneWidget);
+  });
+
   testWidgets('позицию можно дописать руками', (tester) async {
     final api = _FakeApi();
     await pump(tester, api);
@@ -593,25 +641,25 @@ void main() {
 
     // При открытии информация раскрыта: иначе тот, кто не знает про кнопку,
     // не увидит ни поставщика, ни статуса.
-    expect(find.text('ПОСТАВЩИК'), findsOneWidget);
-    expect(find.text('ОБРАБОТКА'), findsOneWidget);
-    await tester.tap(find.text('ИНФОРМАЦИЯ'));
+    expect(find.text('Поставщик'), findsOneWidget);
+    expect(find.text('Обработка'), findsOneWidget);
+    await tester.tap(find.text('Информация'));
     await tester.pumpAndSettle();
 
-    expect(find.text('ПОСТАВЩИК'), findsNothing);
-    expect(find.text('ОБРАБОТКА'), findsNothing);
+    expect(find.text('Поставщик'), findsNothing);
+    expect(find.text('Обработка'), findsNothing);
     // Подписи у переключателя нет — только стрелка.
     expect(find.text('свернуть'), findsNothing);
     expect(find.text('развернуть'), findsNothing);
 
     // Позиции и итог остаются: сворачивается только справочная часть.
-    expect(find.text('ПОЗИЦИИ'), findsOneWidget);
+    expect(find.text('Позиции'), findsOneWidget);
     expect(find.text('Итого'), findsOneWidget);
 
-    await tester.tap(find.text('ИНФОРМАЦИЯ'));
+    await tester.tap(find.text('Информация'));
     await tester.pumpAndSettle();
 
-    expect(find.text('ПОСТАВЩИК'), findsOneWidget);
+    expect(find.text('Поставщик'), findsOneWidget);
   });
 
   testWidgets('свёрнутая информация освобождает место позициям', (
@@ -619,13 +667,13 @@ void main() {
   ) async {
     await pump(tester, _FakeApi());
 
-    final before = tester.getTopLeft(find.text('ПОЗИЦИИ')).dy;
+    final before = tester.getTopLeft(find.text('Позиции')).dy;
 
-    await tester.tap(find.text('ИНФОРМАЦИЯ'));
+    await tester.tap(find.text('Информация'));
     await tester.pumpAndSettle();
 
-    final toggle = tester.getBottomLeft(find.text('ИНФОРМАЦИЯ')).dy;
-    final lines = tester.getTopLeft(find.text('ПОЗИЦИИ')).dy;
+    final toggle = tester.getBottomLeft(find.text('Информация')).dy;
+    final lines = tester.getTopLeft(find.text('Позиции')).dy;
 
     expect(lines, lessThan(before), reason: 'позиции не поднялись вверх');
     // И поднялись вплотную: пустая дыра на месте свёрнутой части — тот же

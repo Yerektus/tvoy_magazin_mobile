@@ -13,18 +13,39 @@ class _FakeApi extends ApiClient {
     this.delay = Duration.zero,
   });
 
+  /// Реплики открытой переписки — той, что отдаёт `/assistant/chat/`.
   final List<Map<String, dynamic>> history;
+
   final String answer;
 
   /// Насколько сервер задумывается. Ноль — мгновенно, и тогда состояния
   /// «аналитик думает» на экране просто не бывает: проверять в нём нечего.
   final Duration delay;
+
   final List<Object> asked = [];
-  int deletes = 0;
+  final List<String> deleted = [];
+
+  /// Прошлые разговоры и реплики того, который открывают из истории.
+  List<Map<String, dynamic>> chats = const [];
+  List<Map<String, dynamic>> archive = const [];
 
   @override
   Future<dynamic> get(String path, {Map<String, String>? query}) async {
-    return <String, dynamic>{'messages': history};
+    if (path == '/assistant/chats/') {
+      return <String, dynamic>{'chats': chats};
+    }
+
+    if (path.startsWith('/assistant/chats/')) {
+      return <String, dynamic>{
+        'chat': {'id': 42, 'title': 'Старый разговор'},
+        'messages': archive,
+      };
+    }
+
+    return <String, dynamic>{
+      'chat': history.isEmpty ? null : {'id': 7, 'title': 'Открытый разговор'},
+      'messages': history,
+    };
   }
 
   @override
@@ -34,6 +55,7 @@ class _FakeApi extends ApiClient {
     final text = (body as Map)['text'];
 
     return <String, dynamic>{
+      'chat': {'id': 7, 'title': text},
       'messages': [
         {
           'id': 1,
@@ -53,7 +75,7 @@ class _FakeApi extends ApiClient {
 
   @override
   Future<dynamic> delete(String path) async {
-    deletes++;
+    deleted.add(path);
     return null;
   }
 }
@@ -113,10 +135,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: buildTheme(),
-        home: AssistantPage(
-          store: AssistantStore(api: api),
-          drawer: const Drawer(),
-        ),
+        home: AssistantPage(store: AssistantStore(api: api)),
       ),
     );
     await tester.pumpAndSettle();
@@ -223,7 +242,7 @@ void main() {
     );
   });
 
-  testWidgets('переписку можно начать заново, но только с согласия', (
+  testWidgets('новый разговор не стирает прежний, а откладывает его', (
     tester,
   ) async {
     final api = await pump(
@@ -240,26 +259,131 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byTooltip('Начать заново'));
+    await tester.tap(find.byTooltip('Новый разговор'));
+    await tester.pumpAndSettle();
+
+    // Экран пуст, но на сервере ничего не удалено: прежний разговор ушёл в
+    // историю и оттуда же продолжается.
+    expect(find.text('Старый вопрос'), findsNothing);
+    expect(api.deleted, isEmpty);
+
+    await tester.enterText(find.byType(TextField), 'Новый вопрос');
+    await tester.tap(find.byTooltip('Спросить'));
+    await tester.pumpAndSettle();
+
+    // Вопрос уходит с пометкой «в новую», иначе сервер дописал бы его в
+    // прежнюю переписку.
+    expect(api.asked, [
+      {'text': 'Новый вопрос', 'fresh': true},
+    ]);
+  });
+
+  testWidgets('следующий вопрос продолжает ту же переписку', (tester) async {
+    final api = await pump(tester, _FakeApi());
+
+    await tester.enterText(find.byType(TextField), 'Первый');
+    await tester.tap(find.byTooltip('Спросить'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'Второй');
+    await tester.tap(find.byTooltip('Спросить'));
+    await tester.pumpAndSettle();
+
+    // У второго вопроса уже есть, к чему привязаться: переписка заведена
+    // первым, и сервер должен дописать в неё, а не начать третью.
+    expect(api.asked.last, {'text': 'Второй', 'chat': 7});
+  });
+
+  testWidgets('пока разговора нет, начинать нечего', (tester) async {
+    await pump(tester, _FakeApi());
+
+    // Подсказку кнопка рисует внутри себя, поэтому от найденной подсказки
+    // поднимаемся к самой кнопке.
+    final button = tester.widget<IconButton>(
+      find.ancestor(
+        of: find.byTooltip('Новый разговор'),
+        matching: find.byType(IconButton),
+      ),
+    );
+
+    expect(button.onPressed, isNull);
+  });
+
+  testWidgets('разговор из истории открывается со своими репликами', (
+    tester,
+  ) async {
+    final api = _FakeApi(
+      history: [
+        {
+          'id': 1,
+          'role': 'user',
+          'text': 'Сегодняшний вопрос',
+          'created_at': '2026-08-23T09:00:00Z',
+        },
+      ],
+    );
+    api.chats = [
+      {
+        'id': 42,
+        'title': 'Старый разговор',
+        'created_at': '2026-08-20T09:00:00Z',
+        'updated_at': '2026-08-20T09:05:00Z',
+      },
+    ];
+    api.archive = [
+      {
+        'id': 5,
+        'role': 'user',
+        'text': 'Вопрос из прошлого',
+        'created_at': '2026-08-20T09:00:00Z',
+      },
+    ];
+
+    await pump(tester, api);
+
+    await tester.tap(find.byTooltip('История разговоров'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Старый разговор'), findsOneWidget);
+
+    await tester.tap(find.text('Старый разговор'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Вопрос из прошлого'), findsOneWidget);
+    expect(find.text('Сегодняшний вопрос'), findsNothing);
+  });
+
+  testWidgets('переписку удаляют из истории, и только с согласия', (
+    tester,
+  ) async {
+    final api = _FakeApi();
+    api.chats = [
+      {
+        'id': 42,
+        'title': 'Старый разговор',
+        'created_at': '2026-08-20T09:00:00Z',
+        'updated_at': '2026-08-20T09:05:00Z',
+      },
+    ];
+
+    await pump(tester, api);
+
+    await tester.tap(find.byTooltip('История разговоров'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Удалить переписку'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Отмена'));
     await tester.pumpAndSettle();
 
-    expect(api.deletes, 0);
-    expect(find.text('Старый вопрос'), findsOneWidget);
+    expect(api.deleted, isEmpty);
 
-    await tester.tap(find.byTooltip('Начать заново'));
+    await tester.tap(find.byTooltip('Удалить переписку'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Начать'));
+    await tester.tap(find.text('Удалить'));
     await tester.pumpAndSettle();
 
-    expect(api.deletes, 1);
-    expect(find.text('Старый вопрос'), findsNothing);
-  });
-
-  testWidgets('пока переписки нет, чистить нечего', (tester) async {
-    await pump(tester, _FakeApi());
-
-    expect(find.byTooltip('Начать заново'), findsNothing);
+    expect(api.deleted, ['/assistant/chats/42/']);
+    expect(find.text('Старый разговор'), findsNothing);
   });
 }

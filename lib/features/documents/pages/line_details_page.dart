@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 
 import '../../../shared/services/api_exception.dart';
 import '../../../shared/widgets/error_dialog.dart';
 import '../../../shared/widgets/inline_field.dart';
 import '../models/document.dart';
 import '../services/documents_store.dart';
+import 'barcode_scan_page.dart';
 
 /// Позиция накладной: что прочитала модель и как это поправить.
 ///
@@ -51,6 +53,25 @@ class _LineDetailsPageState extends State<LineDetailsPage> {
     }
 
     await _save({field: prepared.isEmpty ? null : prepared});
+  }
+
+  /// Считывает штрихкод камерой и кладёт его в поле.
+  ///
+  /// Набирать тринадцать цифр с этикетки руками — самое долгое и самое
+  /// ошибочное место в правке позиции: одна цифра мимо, и кабинет не найдёт
+  /// товар, а понять, где именно опечатка, по такому числу невозможно.
+  Future<void> _scanBarcode() async {
+    // Клавиатуру убираем заранее: иначе поле теряет фокус уже после того, как
+    // сканер вернул код, и следом отправляет старое значение поверх нового.
+    FocusManager.instance.primaryFocus?.unfocus();
+
+    final code = await BarcodeScanPage.open(context);
+
+    if (code == null || !mounted || code == _line.barcode) {
+      return;
+    }
+
+    await _edit('barcode', code, numeric: true);
   }
 
   Future<void> _save(Map<String, dynamic> patch) async {
@@ -125,6 +146,15 @@ class _LineDetailsPageState extends State<LineDetailsPage> {
               note: _line.barcodeGuessed ? 'подставил ИИ' : null,
               keyboardType: TextInputType.number,
               onChanged: (next) => _edit('barcode', next, numeric: true),
+              // Кнопка внутри поля, а не рядом: она про это самое значение, и
+              // отдельной кнопкой её пришлось бы ещё связать глазами с нужной
+              // строкой из шести.
+              suffix: IconButton(
+                onPressed: _saving ? null : _scanBarcode,
+                icon: const Icon(LucideIcons.scan_barcode, size: 20),
+                color: const Color(0xFF0284C7),
+                tooltip: 'Сканировать штрихкод',
+              ),
             ),
             _Field(
               label: 'Количество',
@@ -177,6 +207,7 @@ class _Field extends StatelessWidget {
     this.note,
     this.keyboardType,
     this.maxLines = 1,
+    this.suffix,
   });
 
   final String label;
@@ -186,6 +217,7 @@ class _Field extends StatelessWidget {
   final String? note;
   final TextInputType? keyboardType;
   final int? maxLines;
+  final Widget? suffix;
 
   @override
   Widget build(BuildContext context) {
@@ -214,6 +246,7 @@ class _Field extends StatelessWidget {
                   keyboardType: keyboardType,
                   maxLines: maxLines,
                   onChanged: onChanged,
+                  suffix: suffix,
                 ),
                 if (note != null)
                   Padding(

@@ -44,6 +44,8 @@ dependencies:
   url_launcher: ^6.3.2
   flutter_lucide: ^1.33.0
   flutter_markdown_plus: ^1.0.12
+  mobile_scanner: ^7.4.0
+  flutter_slidable: ^4.0.3
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -96,3 +98,17 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+  # Inter — тот же шрифт, что в веб-кабинете. Кладём файлами, а не тянем с
+  # Google Fonts на запуске: приложением пользуются в подсобке, где сети может
+  # не быть, а подменённый на секунду системный шрифт заметен.
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.ttf
+        - asset: assets/fonts/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Inter-Bold.ttf
+          weight: 700

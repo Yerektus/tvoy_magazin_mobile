@@ -15,10 +15,9 @@ import 'plan_settings.dart';
 /// пересчитать: ассортимент и остатки меняются каждый день, и вчерашний план
 /// сегодня уже врёт.
 class PurchasesPage extends StatefulWidget {
-  const PurchasesPage({super.key, required this.store, required this.drawer});
+  const PurchasesPage({super.key, required this.store});
 
   final PlanStore store;
-  final Widget drawer;
 
   @override
   State<PurchasesPage> createState() => _PurchasesPageState();
@@ -76,7 +75,6 @@ class _PurchasesPageState extends State<PurchasesPage> {
     final plan = store.plan;
 
     return Scaffold(
-      drawer: widget.drawer,
       appBar: AppBar(
         title: const Text('Закупки'),
         bottom: store.isLoading
@@ -157,48 +155,8 @@ class _PurchasesPageState extends State<PurchasesPage> {
 
     return ListView.builder(
       padding: const EdgeInsets.only(bottom: 8),
-      itemCount: plan.items.length + 1,
-      itemBuilder: (_, index) => index == 0
-          ? _Header(plan: plan)
-          : _ItemTile(item: plan.items[index - 1]),
-    );
-  }
-}
-
-/// Что и за какой период посчитано.
-class _Header extends StatelessWidget {
-  const _Header({required this.plan});
-
-  final Plan plan;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      color: const Color(0xFFF0F0F0),
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'ПРОДАЖИ ЗА ${plan.days} ДН. · ЗАКУП НА ${plan.horizon} ДН.',
-            style: const TextStyle(
-              fontSize: 12,
-              letterSpacing: 0.4,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF737373),
-            ),
-          ),
-          if (plan.builtAt != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: Text(
-                'Посчитан ${formatDateTime(plan.builtAt!)}',
-                style: const TextStyle(fontSize: 12, color: Color(0xFFA3A3A3)),
-              ),
-            ),
-        ],
-      ),
+      itemCount: plan.items.length,
+      itemBuilder: (_, index) => _ItemTile(item: plan.items[index]),
     );
   }
 }

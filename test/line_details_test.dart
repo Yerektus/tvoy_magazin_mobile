@@ -111,6 +111,22 @@ void main() {
     expect(fieldNextTo('Товар в UMAG'), findsNothing);
   });
 
+  testWidgets('сканер стоит внутри поля штрихкода, и только у него', (
+    tester,
+  ) async {
+    await pump(tester);
+
+    final scanner = find.byTooltip('Сканировать штрихкод');
+
+    expect(scanner, findsOneWidget);
+    // Именно внутри поля: рядом стоящую кнопку пришлось бы ещё связать глазами
+    // с нужной строкой из шести, а внутри она уже про своё значение.
+    expect(
+      find.descendant(of: fieldNextTo('Штрихкод'), matching: scanner),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('правка количества уходит на сервер', (tester) async {
     final api = await pump(tester);
 

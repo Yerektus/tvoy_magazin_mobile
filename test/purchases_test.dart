@@ -86,7 +86,6 @@ void main() {
             : buildTheme().copyWith(platform: platform),
         home: PurchasesPage(
           store: PlanStore(api: api),
-          drawer: const Drawer(),
         ),
       ),
     );
@@ -107,10 +106,13 @@ void main() {
     expect(find.text('15 400 ₸'), findsOneWidget);
   });
 
-  testWidgets('в шапке видно, за какой период посчитано', (tester) async {
+  testWidgets('над списком не висит справка о периоде', (tester) async {
     await pump(tester, _FakeApi(plan: _ready()));
 
-    expect(find.text('ПРОДАЖИ ЗА 30 ДН. · ЗАКУП НА 14 ДН.'), findsOneWidget);
+    // Период и время расчёта убраны: их спрашивают раз в кнопке пересчёта, а
+    // над каждым открытием плана они висели постоянной полосой.
+    expect(find.textContaining('ПРОДАЖИ ЗА'), findsNothing);
+    expect(find.textContaining('Посчитан'), findsNothing);
   });
 
   testWidgets('на сколько хватит остатка написано у каждой строки', (

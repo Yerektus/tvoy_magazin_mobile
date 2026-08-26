@@ -35,9 +35,12 @@ class _PhotoPageState extends State<PhotoPage> {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
+        // Белая, как везде: чёрная шапка над чёрным полем сливалась с ним, и
+        // её приходилось искать по белой черте снизу.
         title: Text(widget.title, style: const TextStyle(fontSize: 16)),
+        // Черту из общей темы убираем: под шапкой чёрное поле, оно отделено
+        // и так. Пустая рамка, а не `null`: `null` берёт черту из темы.
+        shape: const Border(),
         actions: [
           if (many)
             Padding(
@@ -45,7 +48,10 @@ class _PhotoPageState extends State<PhotoPage> {
               child: Center(
                 child: Text(
                   '${_current + 1} из ${widget.urls.length}',
-                  style: const TextStyle(fontSize: 14, color: Colors.white70),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF737373),
+                  ),
                 ),
               ),
             ),

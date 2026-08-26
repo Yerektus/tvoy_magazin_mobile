@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tvoy_magazin_mobile/features/documents/models/document.dart';
 import 'package:tvoy_magazin_mobile/features/documents/pages/document_details_page.dart';
+import 'package:tvoy_magazin_mobile/features/documents/pages/line_details_page.dart';
 import 'package:tvoy_magazin_mobile/features/documents/pages/photo_page.dart';
 import 'package:tvoy_magazin_mobile/features/documents/services/documents_store.dart';
 import 'package:tvoy_magazin_mobile/features/umag/models/umag_account.dart';
@@ -95,6 +96,25 @@ class _FakeApi extends ApiClient {
       return <String, dynamic>{'supply_id': 123456};
     }
 
+    // Дописанная позиция встаёт первой, остальные сдвигаются — как на сервере.
+    if (path == '/invoices/87/lines/') {
+      lines = [
+        {
+          'id': 900,
+          'position': 1,
+          'name': 'Новая позиция',
+          'quantity': '0.000',
+          'unit': '',
+          'total': '0.00',
+        },
+        for (var i = 0; i < lines.length; i++) ...[
+          {...lines[i], 'position': i + 2},
+        ],
+      ];
+
+      return lines.first;
+    }
+
     return _invoice();
   }
 
@@ -186,6 +206,25 @@ void main() {
     await pump(tester, _FakeApi(image: null));
 
     expect(find.byTooltip('Открыть снимок'), findsNothing);
+  });
+
+  testWidgets('снимок открывают из шапки, а действие стоит под ней', (
+    tester,
+  ) async {
+    await pump(tester, _FakeApi(status: 'done'));
+
+    final height =
+        tester.view.physicalSize.height / tester.view.devicePixelRatio;
+    final photo = tester.getCenter(find.byTooltip('Открыть снимок'));
+    final action = tester.getCenter(find.text('Проверено'));
+
+    // Снимок — в самой шапке.
+    expect(photo.dy, lessThan(kToolbarHeight + 40));
+
+    // Действие — сразу под ней, а не внизу экрана: список позиций длинный, и
+    // до кнопки в подвале приходилось долистывать.
+    expect(action.dy, greaterThan(photo.dy));
+    expect(action.dy, lessThan(height / 3));
   });
 
   testWidgets('итог стоит внизу, а не в шапке', (tester) async {
@@ -356,18 +395,51 @@ void main() {
     expect(api.posts, ['/invoices/87/retry/']);
   });
 
+  testWidgets('позицию можно дописать руками', (tester) async {
+    final api = _FakeApi();
+    await pump(tester, api);
+
+    await tester.tap(find.text('Добавить позицию'));
+    await tester.pumpAndSettle();
+
+    expect(api.posts, ['/invoices/87/lines/']);
+
+    // Пустая строка сразу и открывается: одна она никому не нужна, нужна
+    // заполненная.
+    expect(find.byType(LineDetailsPage), findsOneWidget);
+    expect(find.text('Позиция 1'), findsOneWidget);
+  });
+
+  testWidgets('дописать позицию можно и в пустую накладную', (tester) async {
+    final api = _FakeApi()..lines = [];
+    await pump(tester, api);
+
+    expect(find.text('Позиции не распознаны'), findsOneWidget);
+    expect(find.text('Добавить позицию'), findsOneWidget);
+  });
+
+  /// Тянет строку влево и жмёт открывшуюся кнопку — как человек.
+  ///
+  /// Свайп сам ничего не удаляет: он только показывает кнопку. Спрашивает уже
+  /// она.
+  Future<void> swipe(WidgetTester tester, String line) async {
+    await tester.drag(find.text(line), const Offset(-500, 0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Удалить'));
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('свайп по позиции спрашивает и удаляет её', (tester) async {
     final api = _FakeApi();
     await pump(tester, api);
 
     expect(find.text('Сырок Чудо'), findsOneWidget);
 
-    await tester.drag(find.text('Сырок Чудо'), const Offset(-500, 0));
-    await tester.pumpAndSettle();
+    await swipe(tester, 'Сырок Чудо');
 
     expect(find.text('Удалить позицию?'), findsOneWidget);
 
-    await tester.tap(find.text('Удалить'));
+    await tester.tap(find.text('Удалить').last);
     await tester.pumpAndSettle();
 
     expect(api.deletes, ['/invoices/87/lines/765/']);
@@ -380,8 +452,7 @@ void main() {
     final api = _FakeApi();
     await pump(tester, api);
 
-    await tester.drag(find.text('Сырок Чудо'), const Offset(-500, 0));
-    await tester.pumpAndSettle();
+    await swipe(tester, 'Сырок Чудо');
     await tester.tap(find.text('Отмена'));
     await tester.pumpAndSettle();
 
@@ -396,6 +467,8 @@ void main() {
     await tester.drag(find.text('Сырок Чудо'), const Offset(500, 0));
     await tester.pumpAndSettle();
 
+    // Кнопка удаления живёт справа — влево её не вытянуть.
+    expect(find.text('Удалить'), findsNothing);
     expect(find.text('Удалить позицию?'), findsNothing);
     expect(api.deletes, isEmpty);
   });
@@ -404,9 +477,8 @@ void main() {
     final api = _FakeApi()..refuseDelete = true;
     await pump(tester, api);
 
-    await tester.drag(find.text('Сырок Чудо'), const Offset(-500, 0));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Удалить'));
+    await swipe(tester, 'Сырок Чудо');
+    await tester.tap(find.text('Удалить').last);
     await tester.pumpAndSettle();
 
     expect(find.text('Позиция уже удалена'), findsOneWidget);
@@ -428,9 +500,8 @@ void main() {
 
     final before = tester.getTopLeft(find.text('Проверено'));
 
-    await tester.drag(find.text('Сырок Чудо'), const Offset(-500, 0));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Удалить'));
+    await swipe(tester, 'Сырок Чудо');
+    await tester.tap(find.text('Удалить').last);
 
     // Смотрим на середине работы: раньше кнопка тут пропадала.
     await tester.pump();

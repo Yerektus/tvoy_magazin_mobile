@@ -11,6 +11,7 @@ import 'package:tvoy_magazin_mobile/shared/widgets/app_theme.dart';
 /// Помнит, с каким отбором просили список, и отдаёт заданные строки.
 class _FakeApi extends ApiClient {
   final List<String?> asked = [];
+  final List<String> deletes = [];
 
   List<dynamic> results = <dynamic>[];
 
@@ -21,6 +22,17 @@ class _FakeApi extends ApiClient {
     }
 
     return <String, dynamic>{'results': results, 'connected': false};
+  }
+
+  /// Удалённая накладная уходит из выдачи — как и на сервере, где она не
+  /// стирается, а перестаёт показываться.
+  @override
+  Future<dynamic> delete(String path) async {
+    deletes.add(path);
+    final id = int.parse(path.split('/')[2]);
+    results = results.where((row) => (row as Map)['id'] != id).toList();
+
+    return null;
   }
 }
 
@@ -37,7 +49,6 @@ void main() {
         home: DocumentsPage(
           store: DocumentsStore(api: api),
           umag: UmagAccountStore(api: api),
-          drawer: const Drawer(),
         ),
       ),
     );
@@ -122,7 +133,6 @@ void main() {
         home: DocumentsPage(
           store: DocumentsStore(api: api),
           umag: UmagAccountStore(api: api),
-          drawer: const Drawer(),
         ),
       ),
     );
@@ -167,7 +177,6 @@ void main() {
         home: DocumentsPage(
           store: DocumentsStore(api: api),
           umag: UmagAccountStore(api: api),
-          drawer: const Drawer(),
         ),
       ),
     );
@@ -274,5 +283,94 @@ void main() {
         reason: 'у ${status.name} текст светлее подложки',
       );
     }
+  });
+
+  testWidgets('раскрытый список гасит весь экран, а не только список', (
+    tester,
+  ) async {
+    await pump(tester);
+
+    await tester.tap(find.byTooltip('Добавить накладную'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Сделать снимок'), findsOneWidget);
+    expect(find.text('Выбрать из галереи'), findsOneWidget);
+
+    // Раньше затемнение рисовалось внутри страницы и не доставало ни до шапки
+    // с вкладками, ни до нижней панели разделов: половина экрана оставалась
+    // светлой и нажимаемой.
+    final screen = tester.view.physicalSize / tester.view.devicePixelRatio;
+
+    expect(
+      tester.getRect(find.byType(ModalBarrier).last),
+      Offset.zero & screen,
+    );
+  });
+
+  testWidgets('крестик встаёт ровно на кнопку и закрывает список', (
+    tester,
+  ) async {
+    await pump(tester);
+
+    final was = tester.getRect(find.byTooltip('Добавить накладную'));
+
+    await tester.tap(find.byTooltip('Добавить накладную'));
+    await tester.pumpAndSettle();
+
+    // Кнопка в слое — копия настоящей и стоит на её месте: плюс поворачивается
+    // в крестик, а не подменяется другой кнопкой в стороне.
+    expect(tester.getRect(find.byTooltip('Закрыть')), was);
+
+    await tester.tap(find.byTooltip('Закрыть'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Сделать снимок'), findsNothing);
+  });
+
+  testWidgets('свайп по накладной спрашивает и удаляет её', (tester) async {
+    final api = _FakeApi()
+      ..results = [
+        row(id: 1, supplier: 'ИП СУЛТАН', at: '2026-08-21T16:46:00'),
+        row(id: 2, supplier: 'ZOR', at: '2026-08-21T09:05:00'),
+      ];
+
+    await open(tester, api);
+
+    // Свайп сам ничего не удаляет: он только показывает кнопку.
+    await tester.drag(find.text('ИП СУЛТАН'), const Offset(-500, 0));
+    await tester.pumpAndSettle();
+
+    expect(api.deletes, isEmpty);
+
+    await tester.tap(find.text('Удалить'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Удалить накладную?'), findsOneWidget);
+
+    await tester.tap(find.text('Удалить').last);
+    await tester.pumpAndSettle();
+
+    expect(api.deletes, ['/invoices/1/']);
+    expect(find.text('ИП СУЛТАН'), findsNothing);
+    expect(find.text('ZOR'), findsOneWidget);
+  });
+
+  testWidgets('отказались — накладная остаётся в списке', (tester) async {
+    final api = _FakeApi()
+      ..results = [
+        row(id: 1, supplier: 'ИП СУЛТАН', at: '2026-08-21T16:46:00'),
+      ];
+
+    await open(tester, api);
+
+    await tester.drag(find.text('ИП СУЛТАН'), const Offset(-500, 0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Удалить'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Отмена'));
+    await tester.pumpAndSettle();
+
+    expect(api.deletes, isEmpty);
+    expect(find.text('ИП СУЛТАН'), findsOneWidget);
   });
 }

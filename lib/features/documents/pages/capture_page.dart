@@ -182,9 +182,13 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        foregroundColor: Colors.white,
+        // Белая, как везде в приложении: прозрачная поверх кадра выглядела
+        // экраном из чужой программы, а её белая черта — единственным, что
+        // отделяет шапку от чёрного.
         title: const Text('Снимок накладной'),
+        // Под шапкой тёмный кадр — он отделён и без черты из общей темы.
+        // Пустая рамка, а не `null`: `null` означает «взять из темы».
+        shape: const Border(),
       ),
       extendBodyBehindAppBar: true,
       body: _body(),

@@ -4,21 +4,23 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import '../../../shared/services/api_exception.dart';
 import '../../../shared/widgets/app_theme.dart';
-import '../../../shared/widgets/confirm_dialog.dart';
 import '../../../shared/widgets/error_dialog.dart';
 import '../../../shared/widgets/message.dart';
 import '../models/chat_message.dart';
 import '../services/assistant_store.dart';
+import 'chat_history_page.dart';
 
-/// Разговор с аналитиком: вопросы про накладные, поставщиков и закупки.
+/// Разговор с помощником: вопросы про накладные, поставщиков и закупки.
 ///
-/// Аналитик смотрит только данные своей организации, и смотрит их сам —
+/// Помощник смотрит только данные своей организации, и смотрит их сам —
 /// спрашивать его можно как человека, а не выбирать отчёт из списка.
+///
+/// Разговоров у человека много, и открыт всегда один: прошлые лежат в истории
+/// и оттуда же продолжаются.
 class AssistantPage extends StatefulWidget {
-  const AssistantPage({super.key, required this.store, required this.drawer});
+  const AssistantPage({super.key, required this.store});
 
   final AssistantStore store;
-  final Widget drawer;
 
   @override
   State<AssistantPage> createState() => _AssistantPageState();
@@ -81,18 +83,23 @@ class _AssistantPageState extends State<AssistantPage> {
     }
   }
 
-  Future<void> _clear() async {
-    final agreed = await confirm(
-      context,
-      title: 'Начать заново?',
-      message: 'Переписка сотрётся.',
-      action: 'Начать',
-      dangerous: true,
-    );
-
-    if (agreed && mounted) {
-      await widget.store.clear();
+  /// Начинает новый разговор. Спрашивать согласия больше не за что: прежний
+  /// не стирается, а уходит в историю, и вернуться в него — два нажатия.
+  void _startNew() {
+    if (widget.store.messages.isNotEmpty) {
+      widget.store.startNew();
     }
+  }
+
+  /// Открывает историю и, если оттуда что-то выбрали, — саму переписку.
+  Future<void> _openHistory() async {
+    final chosen = await ChatHistoryPage.open(context, widget.store);
+
+    if (chosen == null || !mounted || chosen == widget.store.chatId) {
+      return;
+    }
+
+    await widget.store.openChat(chosen);
   }
 
   @override
@@ -100,16 +107,19 @@ class _AssistantPageState extends State<AssistantPage> {
     final store = widget.store;
 
     return Scaffold(
-      drawer: widget.drawer,
       appBar: AppBar(
-        title: const Text('Аналитик'),
+        title: const Text('Помощник'),
         actions: [
-          if (store.messages.isNotEmpty)
-            IconButton(
-              onPressed: _clear,
-              icon: const Icon(LucideIcons.trash_2, size: 20),
-              tooltip: 'Начать заново',
-            ),
+          IconButton(
+            onPressed: _openHistory,
+            icon: const Icon(LucideIcons.list, size: 20),
+            tooltip: 'История разговоров',
+          ),
+          IconButton(
+            onPressed: store.messages.isEmpty ? null : _startNew,
+            icon: const Icon(LucideIcons.square_pen, size: 20),
+            tooltip: 'Новый разговор',
+          ),
           const SizedBox(width: 4),
         ],
       ),
@@ -165,11 +175,7 @@ class _Empty extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              LucideIcons.message_square,
-              size: 40,
-              color: Color(0xFFA3A3A3),
-            ),
+            Icon(LucideIcons.bot, size: 40, color: Color(0xFFA3A3A3)),
             SizedBox(height: 12),
             Text(
               'Спросите про магазин',
@@ -182,7 +188,13 @@ class _Empty extends StatelessWidget {
   }
 }
 
-/// Реплика: своя справа на синем, ответ аналитика слева на сером.
+/// Реплика: свой вопрос справа в синем пузыре, ответ аналитика — во всю
+/// ширину без подложки.
+///
+/// Пузырь у ответа убран не для красоты. Аналитик отвечает таблицами, и в
+/// пузыре шириной в четыре пятых экрана колонки сжимались так, что «Товар»
+/// переносился по слогам. Своя реплика короткая, ей пузырь идёт; ответ —
+/// это текст страницы, а не записка.
 ///
 /// Свою реплику показываем как есть: человек пишет вопрос словами, а не
 /// разметкой. Ответ аналитика разбираем как markdown — жирным он выделяет
@@ -194,31 +206,121 @@ class _Bubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: message.mine ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.sizeOf(context).width * 0.82,
-        ),
-        decoration: BoxDecoration(
-          color: message.mine ? accent : const Color(0xFFF0F0F0),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: message.mine
-            ? SelectableText(
-                message.text,
-                style: const TextStyle(color: Colors.white, height: 1.4),
-              )
-            : MarkdownBody(
-                data: message.text,
-                selectable: true,
-                styleSheet: _markdown(context),
+    return message.mine ? _mine(context) : _theirs(context);
+  }
+
+  Widget _mine(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.sizeOf(context).width * 0.82,
               ),
+              decoration: const BoxDecoration(
+                color: accent,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  topRight: Radius.circular(12),
+                  bottomLeft: Radius.circular(12),
+                  // Угол под хвостиком почти не скруглён: при полном радиусе
+                  // между ним и хвостиком остаётся светлая щель.
+                  bottomRight: Radius.circular(4),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  SelectableText(
+                    message.text,
+                    style: const TextStyle(color: Colors.white, height: 1.4),
+                  ),
+                  if (message.createdAt != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        formatSentAt(message.createdAt!),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          // Хвостик: показывает, от кого реплика, даже когда она одна на
+          // экране и сравнить её не с чем. Не у самого дна: висящий на нижнем
+          // краю уголок читается как обрыв пузыря, а не как его хвост.
+          const Padding(padding: EdgeInsets.only(bottom: 6), child: _Tail()),
+        ],
       ),
     );
   }
+
+  Widget _theirs(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          MarkdownBody(
+            data: message.text,
+            selectable: true,
+            styleSheet: _markdown(context),
+          ),
+          if (message.createdAt != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                formatSentAt(message.createdAt!),
+                style: const TextStyle(fontSize: 11, color: Color(0xFFA3A3A3)),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Хвостик синего пузыря — уголок у его правого нижнего края.
+class _Tail extends StatelessWidget {
+  const _Tail();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      width: 7,
+      height: 12,
+      child: CustomPaint(painter: _TailPainter()),
+    );
+  }
+}
+
+class _TailPainter extends CustomPainter {
+  const _TailPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Треугольник от нижнего угла пузыря вбок и вниз — тот же цвет, что и
+    // пузырь, поэтому шва между ними не видно.
+    final tail = Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+
+    canvas.drawPath(tail, Paint()..color = accent);
+  }
+
+  @override
+  bool shouldRepaint(_TailPainter old) => false;
 }
 
 /// Как выглядит разметка в ответе аналитика.
@@ -243,8 +345,16 @@ MarkdownStyleSheet _markdown(BuildContext context) {
     h4: bold,
     h5: bold,
     h6: bold,
-    // Отступ между абзацами меньше пустой строки: пузырь и так узкий, а
-    // разделов в ответе бывает много.
+    // Колонки по содержимому, а не поровну: при равных долях «Выручка» и
+    // «Продано» переносились по слогам, а сумма в две строки не читается.
+    // На такой ширине пакет сам даёт таблице прокрутку вбок.
+    tableColumnWidth: const IntrinsicColumnWidth(),
+    tableCellsPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    tableBorder: TableBorder.all(color: const Color(0xFFE5E5E5), width: 1),
+    tableHead: bold,
+    tableBody: text,
+    // Отступ между абзацами меньше пустой строки: разделов в ответе бывает
+    // много, а пустая строка между ними разгоняет ответ на два экрана.
     blockSpacing: 8,
     listIndent: 16,
     h1Padding: EdgeInsets.zero,

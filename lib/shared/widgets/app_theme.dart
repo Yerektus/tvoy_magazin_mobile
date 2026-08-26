@@ -24,6 +24,9 @@ ThemeData buildTheme() {
   return ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
+    // Inter — как в веб-кабинете. Системный шрифт на айфоне и на андроиде
+    // разный, и одни и те же экраны выглядели по-разному на двух телефонах.
+    fontFamily: 'Inter',
     scaffoldBackgroundColor: const Color(0xFFFAFAFA),
     appBarTheme: const AppBarTheme(
       backgroundColor: Colors.white,

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../shared/widgets/app_drawer.dart';
+import '../shared/widgets/app_nav.dart';
 import 'assistant/pages/assistant_page.dart';
 import 'assistant/services/assistant_store.dart';
 import 'auth/services/auth.dart';
@@ -8,13 +8,15 @@ import 'documents/pages/documents_page.dart';
 import 'documents/services/documents_store.dart';
 import 'purchases/pages/purchases_page.dart';
 import 'purchases/services/plan_store.dart';
+import 'settings/pages/settings_page.dart';
 import 'umag/services/umag_store.dart';
 
-/// Что показано после входа: раздел выбирают в боковом меню.
+/// Что показано после входа: раздел выбирают в нижней панели.
 ///
 /// Разделы не складываются в стопку навигации, а подменяют друг друга: они
 /// равноправны, и «назад» из закупок должно уводить из приложения, а не в
-/// документы. Меню одно на оба — его и передаём вниз готовым виджетом.
+/// документы. Панель одна на все — она и живёт здесь, снаружи страниц, а
+/// страница со своей шапкой и кнопками ложится в тело.
 class HomePage extends StatefulWidget {
   const HomePage({
     super.key,
@@ -40,21 +42,28 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final drawer = AppDrawer(
-      auth: widget.auth,
-      umag: widget.umag,
-      current: _section,
-      onSelect: (section) => setState(() => _section = section),
-    );
+    // Под клавиатурой панель прячем. Иначе в «Помощнике» она встаёт полосой
+    // между полем ввода и клавиатурой и отъедает у переписки высоту как раз
+    // тогда, когда её меньше всего: переключаться между разделами посреди
+    // набранного вопроса всё равно никто не станет.
+    final typing = MediaQuery.viewInsetsOf(context).bottom > 0;
 
-    return switch (_section) {
-      Section.documents => DocumentsPage(
-        store: widget.documents,
-        umag: widget.umag,
-        drawer: drawer,
-      ),
-      Section.purchases => PurchasesPage(store: widget.plans, drawer: drawer),
-      Section.assistant => AssistantPage(store: widget.chat, drawer: drawer),
-    };
+    return Scaffold(
+      body: switch (_section) {
+        Section.documents => DocumentsPage(
+          store: widget.documents,
+          umag: widget.umag,
+        ),
+        Section.purchases => PurchasesPage(store: widget.plans),
+        Section.assistant => AssistantPage(store: widget.chat),
+        Section.settings => SettingsPage(auth: widget.auth, umag: widget.umag),
+      },
+      bottomNavigationBar: typing
+          ? null
+          : AppBottomBar(
+              current: _section,
+              onSelect: (section) => setState(() => _section = section),
+            ),
+    );
   }
 }

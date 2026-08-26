@@ -17,6 +17,7 @@ class InlineField extends StatefulWidget {
     this.keyboardType,
     this.maxLines = 1,
     this.enabled = true,
+    this.suffix,
   });
 
   final String value;
@@ -34,6 +35,10 @@ class InlineField extends StatefulWidget {
   /// иначе обрезаются, а править вслепую то, чего не видно, невозможно.
   final int? maxLines;
   final bool enabled;
+
+  /// Кнопка внутри поля, у правого края. Нужна там, где значение можно не
+  /// набирать, а взять готовым — например, считать штрихкод камерой.
+  final Widget? suffix;
 
   @override
   State<InlineField> createState() => _InlineFieldState();
@@ -117,6 +122,13 @@ class _InlineFieldState extends State<InlineField> {
         fillColor: const Color(0xFFF5F5F5),
         hintText: widget.hint,
         hintStyle: const TextStyle(color: Color(0xFFA3A3A3)),
+        suffixIcon: widget.suffix,
+        // Иначе поле с кнопкой вырастает выше соседних: минимум у суффикса
+        // считается по кнопке, а не по строке текста.
+        suffixIconConstraints: const BoxConstraints(
+          minWidth: 40,
+          minHeight: 40,
+        ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 10,
           vertical: 10,

@@ -4,6 +4,7 @@ import 'dart:async';
 
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 
 import '../../../shared/services/api_exception.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
@@ -233,6 +234,41 @@ class _DocumentDetailsPageState extends State<DocumentDetailsPage> {
     }
   }
 
+  /// Дописать позицию, которую модель пропустила.
+  ///
+  /// Строка заводится пустой и сразу открывается: одна она никому не нужна,
+  /// нужна заполненная, а вбивать её всё равно с бумаги.
+  Future<void> _addLine() async {
+    setState(() => _saving = true);
+
+    try {
+      final detail = await widget.store.addLine(widget.item.id);
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() => _detail = detail);
+
+      // Сервер ставит новую строку первой — она же и открывается.
+      if (detail.lines.isNotEmpty) {
+        await _openLine(detail.lines.first);
+      }
+    } on ApiException catch (error) {
+      if (mounted) {
+        await showErrorDialog(
+          context,
+          title: 'Не удалось добавить позицию',
+          message: error.message,
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
+
   /// Выкинуть позицию. Спрашиваем: вернуть строку нечем — заново её пришлось бы
   /// вбивать руками, глядя в бумагу.
   Future<bool> _confirmDelete(DocumentLine line) async {
@@ -382,6 +418,9 @@ class _DocumentDetailsPageState extends State<DocumentDetailsPage> {
     // Итог берём из свежих данных, а пока они едут — из строки списка.
     final total = _detail?.item.total ?? widget.item.total;
 
+    final photos = _detail?.photos ?? const <String>[];
+    final action = _action;
+
     return Scaffold(
       appBar: AppBar(
         // Номера накладных длинные, и полноразмерный заголовок обрезается
@@ -393,24 +432,43 @@ class _DocumentDetailsPageState extends State<DocumentDetailsPage> {
             icon: const Icon(LucideIcons.scan_text),
             tooltip: 'Распознать заново',
           ),
+          // Снимок — в шапке: смотреть бумагу нужно на любом шаге, а внизу
+          // кнопка делила место с главным действием и была вдвое уже него,
+          // хотя нажимают её не реже.
+          //
+          // Кнопки нет вовсе, когда нет снимка: у накладных, залитых до того,
+          // как мы стали хранить оригинал, открывать нечего.
+          if (photos.isNotEmpty)
+            IconButton(
+              onPressed: _openPhoto,
+              icon: const Icon(LucideIcons.image),
+              tooltip: 'Открыть снимок',
+            ),
           const SizedBox(width: 4),
         ],
-        bottom: _saving
-            ? const PreferredSize(
-                preferredSize: Size.fromHeight(2),
-                child: LinearProgressIndicator(minHeight: 2),
-              )
-            : null,
+        // Место под полоску работы держим всегда. Раньше она появлялась и
+        // исчезала вместе с высотой шапки, и всё под ней — вместе с кнопкой
+        // действия — дёргалось вниз-вверх на два пикселя.
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(2),
+          child: _saving
+              ? const LinearProgressIndicator(minHeight: 2)
+              : const SizedBox(height: 2),
+        ),
       ),
-      body: RefreshIndicator(onRefresh: _load, child: _body()),
-      // Итог и кнопки внизу, всегда на виду: сумму сверяют с бумагой чаще
-      // прочего, а список позиций длинный — прокрутив его, человек потерял бы
-      // и её, и кнопки, если бы те стояли в шапке.
-      bottomNavigationBar: _BottomBar(
-        total: total,
-        action: _action,
-        onPhoto: (_detail?.photos.isEmpty ?? true) ? null : _openPhoto,
+      body: Column(
+        children: [
+          // Следующий шаг — сразу под шапкой и не прокручивается: список
+          // позиций длинный, и до кнопки внизу приходилось долистывать.
+          if (action != null) _ActionBar(child: action),
+          Expanded(
+            child: RefreshIndicator(onRefresh: _load, child: _body()),
+          ),
+        ],
       ),
+      // Итог внизу, всегда на виду: сумму сверяют с бумагой чаще прочего, а
+      // прокрутив длинный список позиций, человек потерял бы её.
+      bottomNavigationBar: _BottomBar(total: total),
     );
   }
 
@@ -571,8 +629,9 @@ class _DocumentDetailsPageState extends State<DocumentDetailsPage> {
         _Lines(
           lines: detail.lines,
           onTap: _openLine,
-          onConfirmDelete: _confirmDelete,
           onDelete: _deleteLine,
+          onConfirmDelete: _confirmDelete,
+          onAdd: _saving ? null : _addLine,
         ),
         const SizedBox(height: 16),
       ],
@@ -631,23 +690,31 @@ class _InfoToggle extends StatelessWidget {
   }
 }
 
-/// Нижняя панель: итог и то, что с накладной можно сделать.
+/// Полоса под шапкой с тем, что с накладной делают дальше.
+class _ActionBar extends StatelessWidget {
+  const _ActionBar({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Color(0xFFE5E5E5))),
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+      child: child,
+    );
+  }
+}
+
+/// Нижняя панель: сколько всего по накладной.
 class _BottomBar extends StatelessWidget {
-  const _BottomBar({
-    required this.total,
-    required this.action,
-    required this.onPhoto,
-  });
+  const _BottomBar({required this.total});
 
   final double? total;
-
-  /// Следующий шаг накладной. Пусто — шага нет: она либо ещё разбирается, либо
-  /// уже прошла весь путь.
-  final Widget? action;
-
-  /// Пусто — снимка нет: у накладных, залитых до того, как мы стали хранить
-  /// оригинал, открывать нечего.
-  final VoidCallback? onPhoto;
 
   @override
   Widget build(BuildContext context) {
@@ -660,84 +727,22 @@ class _BottomBar extends StatelessWidget {
         top: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Итого',
-                    style: TextStyle(color: Color(0xFF737373)),
-                  ),
-                  Text(
-                    formatMoney(total),
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-              if (action != null || onPhoto != null) ...[
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    // Главное действие занимает всю оставшуюся ширину: оно на
-                    // экране одно, и промахнуться по нему нельзя.
-                    if (action != null) Expanded(child: action!),
-                    if (action != null && onPhoto != null)
-                      const SizedBox(width: 12),
-                    if (onPhoto != null)
-                      _PhotoButton(onPressed: onPhoto!, wide: action == null),
-                  ],
+              const Text('Итого', style: TextStyle(color: Color(0xFF737373))),
+              Text(
+                formatMoney(total),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
                 ),
-              ],
+              ),
             ],
           ),
         ),
       ),
     );
-  }
-}
-
-/// Кнопка снимка. Рядом с действием — квадратная, одна — во всю ширину.
-class _PhotoButton extends StatelessWidget {
-  const _PhotoButton({required this.onPressed, required this.wide});
-
-  final VoidCallback onPressed;
-  final bool wide;
-
-  @override
-  Widget build(BuildContext context) {
-    // Подпись нужна не только для подсказки: у кнопки с одной иконкой нет
-    // текста, и без неё читалка экрана назовёт её просто «кнопка».
-    final button = Tooltip(
-      message: 'Открыть снимок',
-      child: OutlinedButton(
-        onPressed: onPressed,
-        style: OutlinedButton.styleFrom(
-          // `Size.fromHeight` задаёт бесконечную ширину — в ряду без `Expanded`
-          // это разваливает вёрстку. Узкой кнопке нужна своя ширина.
-          minimumSize: wide ? const Size.fromHeight(48) : const Size(56, 48),
-          padding: wide ? null : EdgeInsets.zero,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-          side: const BorderSide(color: Color(0xFFD4D4D4)),
-        ),
-        child: wide
-            ? const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(LucideIcons.image, size: 18),
-                  SizedBox(width: 8),
-                  Text('Снимок'),
-                ],
-              )
-            : const Icon(LucideIcons.image, size: 20),
-      ),
-    );
-
-    return wide ? Expanded(child: button) : button;
   }
 }
 
@@ -940,27 +945,22 @@ class _Lines extends StatelessWidget {
   const _Lines({
     required this.lines,
     required this.onTap,
-    required this.onConfirmDelete,
     required this.onDelete,
+    required this.onConfirmDelete,
+    required this.onAdd,
   });
 
   final List<DocumentLine> lines;
   final void Function(DocumentLine) onTap;
-  final Future<bool> Function(DocumentLine) onConfirmDelete;
   final void Function(DocumentLine) onDelete;
+  final Future<bool> Function(DocumentLine) onConfirmDelete;
+
+  /// Пусто — прямо сейчас с накладной уже что-то делают, и второй запрос ей ни
+  /// к чему.
+  final VoidCallback? onAdd;
 
   @override
   Widget build(BuildContext context) {
-    if (lines.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.fromLTRB(16, 24, 16, 0),
-        child: Text(
-          'Позиции не распознаны',
-          style: TextStyle(color: Color(0xFF737373)),
-        ),
-      );
-    }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -975,34 +975,73 @@ class _Lines extends StatelessWidget {
             ),
           ),
         ),
+
+        if (lines.isEmpty)
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Text(
+              'Позиции не распознаны',
+              style: TextStyle(color: Color(0xFF737373)),
+            ),
+          ),
+
         for (final line in lines)
           // Ключ по id строки, а не по номеру: после удаления сервер
-          // перенумеровывает оставшиеся, и по номеру Flutter принял бы соседнюю
-          // строку за только что убранную.
-          Dismissible(
+          // перенумеровывает оставшиеся, и по номеру Flutter принял бы
+          // соседнюю строку за только что убранную.
+          Slidable(
             key: ValueKey(line.id),
-            direction: DismissDirection.endToStart,
-            background: const _DeleteBackground(),
-            confirmDismiss: (_) => onConfirmDelete(line),
-            onDismissed: (_) => onDelete(line),
+            endActionPane: ActionPane(
+              motion: const DrawerMotion(),
+              // Кнопка занимает четверть ширины: строку при этом видно, и
+              // понятно, к чему относится «Удалить».
+              extentRatio: 0.28,
+              children: [
+                SlidableAction(
+                  onPressed: (_) async {
+                    if (await onConfirmDelete(line)) {
+                      onDelete(line);
+                    }
+                  },
+                  backgroundColor: const Color(0xFFDC2626),
+                  foregroundColor: Colors.white,
+                  icon: LucideIcons.trash_2,
+                  label: 'Удалить',
+                ),
+              ],
+            ),
             child: _LineTile(line: line, onTap: () => onTap(line)),
           ),
+
+        // Модель иногда пропускает строку целиком — дописать её нужно руками.
+        // Кнопка внизу списка, а не в шапке раздела: дописывают после того,
+        // как сверили остальные, и палец в этот момент уже здесь.
+        _AddLineButton(onPressed: onAdd),
       ],
     );
   }
 }
 
-/// Что видно под строкой, пока её тянут влево.
-class _DeleteBackground extends StatelessWidget {
-  const _DeleteBackground();
+/// Кнопка «Добавить позицию» под списком.
+class _AddLineButton extends StatelessWidget {
+  const _AddLineButton({required this.onPressed});
+
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: const Color(0xFFDC2626),
-      alignment: Alignment.centerRight,
-      padding: const EdgeInsets.only(right: 24),
-      child: const Icon(LucideIcons.trash_2, color: Colors.white),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: OutlinedButton.icon(
+        onPressed: onPressed,
+        icon: const Icon(LucideIcons.plus, size: 18),
+        label: const Text('Добавить позицию'),
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size.fromHeight(44),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+          side: const BorderSide(color: Color(0xFFD4D4D4)),
+        ),
+      ),
     );
   }
 }

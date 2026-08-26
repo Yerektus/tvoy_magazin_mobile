@@ -131,7 +131,11 @@ String formatDateTime(DateTime date) =>
 /// строке значит тратить место на то, что и так написано выше.
 String formatTime(DateTime date) => '${_two(date.hour)}:${_two(date.minute)}';
 
-/// Заголовок дня в списке: «ЧТ 21 АВГУСТА», а для сегодня и вчера — словами.
+/// Заголовок дня в списке: «Чт 21 августа», а для сегодня и вчера — словами.
+///
+/// Капсом не пишем: заголовок дня — это дата, а не крик, и набранное
+/// прописными «ВТ 18 АВГУСТА» читается медленнее — глаз узнаёт слово по
+/// очертанию, а у капса очертание у всех слов одинаковое.
 ///
 /// Своего дня недели и месяца в родительном падеже у `intl` для русского нет в
 /// нужном виде, а тянуть локали ради двух списков ни к чему.
@@ -142,21 +146,21 @@ String formatDayHeader(DateTime date, {DateTime? today}) {
   final shift = start.difference(day).inDays;
 
   if (shift == 0) {
-    return 'СЕГОДНЯ';
+    return 'Сегодня';
   }
 
   if (shift == 1) {
-    return 'ВЧЕРА';
+    return 'Вчера';
   }
 
   final weekday = _weekdays[date.weekday - 1];
   final month = _months[date.month - 1];
   final year = date.year == now.year ? '' : ' ${date.year}';
 
-  return '$weekday ${date.day} $month$year'.toUpperCase();
+  return '$weekday ${date.day} $month$year';
 }
 
-const _weekdays = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
+const _weekdays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
 /// Месяцы в родительном падеже: «21 августа», а не «21 август».
 const _months = [

@@ -14,6 +14,7 @@ class UmagAccountStore extends ChangeNotifier {
   final ApiClient _api;
 
   UmagAccount _account = UmagAccount.empty;
+  List<UmagCategory>? _categories;
   bool _busy = false;
 
   UmagAccount get account => _account;
@@ -56,9 +57,30 @@ class UmagAccountStore extends ChangeNotifier {
     }
   }
 
+  /// Полки кабинета — для карточки нового товара.
+  ///
+  /// Читаем по требованию и запоминаем: список на сотню строк, а нужен он
+  /// только там, где заводят товар, которого в кабинете ещё нет.
+  Future<List<UmagCategory>> categories() async {
+    if (_categories != null) {
+      return _categories!;
+    }
+
+    final body = await _api.get('/umag/categories/') as Map<String, dynamic>;
+
+    _categories = (body['categories'] as List)
+        .map(
+          (row) => UmagCategory.fromJson(Map<String, dynamic>.from(row as Map)),
+        )
+        .toList();
+
+    return _categories!;
+  }
+
   /// Вышли из приложения — состояние чужого кабинета помнить незачем.
   void forget() {
     _account = UmagAccount.empty;
+    _categories = null;
     notifyListeners();
   }
 }

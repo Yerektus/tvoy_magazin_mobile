@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tvoy_magazin_mobile/features/documents/models/document.dart';
 import 'package:tvoy_magazin_mobile/features/documents/pages/line_details_page.dart';
 import 'package:tvoy_magazin_mobile/features/documents/services/documents_store.dart';
+import 'package:tvoy_magazin_mobile/features/umag/services/umag_store.dart';
 import 'package:tvoy_magazin_mobile/shared/services/api_client.dart';
 
 /// Подменяет сеть: помнит, что и куда ушло.
@@ -26,6 +27,15 @@ class _FakeApi extends ApiClient {
 
   @override
   Future<dynamic> get(String path, {Map<String, String>? query}) async {
+    if (path == '/umag/categories/') {
+      return <String, dynamic>{
+        'categories': [
+          {'id': 900, 'name': 'Незаданные'},
+          {'id': 901, 'name': 'Напитки'},
+        ],
+      };
+    }
+
     // Ответ на перечитывание накладной после правки.
     if (path == '/invoices/87/') {
       return <String, dynamic>{
@@ -64,18 +74,44 @@ const _line = DocumentLine(
   total: 380,
   umagProductName: 'МОЛ.КОКТЕЛЬ ВАНИЛЬ',
   umagConfidence: 1,
+  umagMissing: false,
+  umagNewName: '',
+  umagNewMeasure: null,
+  umagNewCategoryId: null,
+  umagNewSellingPrice: null,
+);
+
+/// Такая строка приходит, когда кабинет не знает этого штрихкода.
+const _missing = DocumentLine(
+  id: 765,
+  position: 1,
+  name: 'Коржик Ромашка 500 гр',
+  barcode: '4870145009999',
+  barcodeAuto: false,
+  quantity: 4,
+  unit: 'шт',
+  price: 250,
+  total: 1000,
+  umagProductName: '',
+  umagConfidence: null,
+  umagMissing: true,
+  umagNewName: '',
+  umagNewMeasure: null,
+  umagNewCategoryId: null,
+  umagNewSellingPrice: null,
 );
 
 void main() {
-  Future<_FakeApi> pump(WidgetTester tester) async {
+  Future<_FakeApi> pump(WidgetTester tester, {DocumentLine? line}) async {
     final api = _FakeApi();
 
     await tester.pumpWidget(
       MaterialApp(
         home: LineDetailsPage(
           store: DocumentsStore(api: api),
+          umag: UmagAccountStore(api: api),
           invoiceId: 87,
-          line: _line,
+          line: line ?? _line,
         ),
       ),
     );
@@ -192,5 +228,45 @@ void main() {
       tester.widget<TextField>(fieldNextTo('Сумма')).controller?.text,
       '3800',
     );
+  });
+
+  testWidgets('у товара, которого нет в UMAG, спрашивают карточку', (
+    tester,
+  ) async {
+    await pump(tester, line: _missing);
+    // Полки приезжают запросом — ждём его.
+    await tester.pumpAndSettle();
+
+    // Поля стоят под теми, что с бумаги, — до них нужно долистать.
+    await tester.drag(find.byType(ListView), const Offset(0, -500));
+    await tester.pumpAndSettle();
+
+    // Те же поля, что в форме кабинета: под каким названием положить, на какую
+    // полку, чем меряют и почём продавать.
+    expect(find.text('Новый товар в UMAG'), findsOneWidget);
+    expect(find.text('Тип товара'), findsOneWidget);
+    expect(find.text('Категория'), findsOneWidget);
+    expect(find.text('Цена продажи'), findsOneWidget);
+  });
+
+  testWidgets('у знакомого товара этих полей нет', (tester) async {
+    await pump(tester);
+
+    expect(find.text('Новый товар в UMAG'), findsNothing);
+    expect(find.text('Цена продажи'), findsNothing);
+  });
+
+  testWidgets('выбранная полка уходит на сервер', (tester) async {
+    final api = await pump(tester, line: _missing);
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView), const Offset(0, -500));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Незаданные'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Напитки').last);
+    await tester.pumpAndSettle();
+
+    expect(api.patches.first.body, {'umag_new_category_id': '901'});
   });
 }

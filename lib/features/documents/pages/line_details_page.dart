@@ -4,6 +4,8 @@ import 'package:flutter_lucide/flutter_lucide.dart';
 import '../../../shared/services/api_exception.dart';
 import '../../../shared/widgets/error_dialog.dart';
 import '../../../shared/widgets/inline_field.dart';
+import '../../umag/models/umag_account.dart';
+import '../../umag/services/umag_store.dart';
 import '../models/document.dart';
 import '../services/documents_store.dart';
 import 'barcode_scan_page.dart';
@@ -19,11 +21,17 @@ class LineDetailsPage extends StatefulWidget {
   const LineDetailsPage({
     super.key,
     required this.store,
+    required this.umag,
     required this.invoiceId,
     required this.line,
   });
 
   final DocumentsStore store;
+
+  /// Кабинет нужен ради полок: у товара, которого там ещё нет, человек
+  /// выбирает категорию.
+  final UmagAccountStore umag;
+
   final int invoiceId;
   final DocumentLine line;
 
@@ -35,9 +43,37 @@ class _LineDetailsPageState extends State<LineDetailsPage> {
   late DocumentLine _line = widget.line;
   bool _saving = false;
 
+  /// Полки кабинета. Пусто, пока не приехали или пока кабинет не подключён —
+  /// тогда категорию не спрашиваем, товар уедет в «Незаданные».
+  List<UmagCategory> _categories = const [];
+
   /// Правил ли человек хоть что-то: по этому список на прошлой странице решает,
   /// перечитывать ли себя.
   bool _changed = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Полки нужны только тому товару, которого в кабинете ещё нет: остальным
+    // спрашивать их незачем, а список длинный.
+    if (widget.line.umagMissing) {
+      _loadCategories();
+    }
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final categories = await widget.umag.categories();
+
+      if (mounted) {
+        setState(() => _categories = categories);
+      }
+    } on ApiException {
+      // Молча: без списка полка просто не выбирается, а карточка позиции
+      // остаётся рабочей.
+    }
+  }
 
   Future<void> _edit(String field, String next, {bool numeric = false}) async {
     // Запятую с телефонной клавиатуры сервер не поймёт — она там вместо точки.
@@ -190,11 +226,147 @@ class _LineDetailsPageState extends State<LineDetailsPage> {
               // Сопоставление ведёт сам кабинет: у нас правят штрихкод, а товар
               // подбирается по нему заново.
               _ReadOnly(label: 'Товар в UMAG', value: _line.umagProductName),
+
+            // Товара с таким штрихкодом в кабинете нет — заведём его при
+            // отправке. Поля те же, что в форме кабинета: под каким названием
+            // положить, на какую полку, чем меряют и почём продавать.
+            if (_line.umagMissing) ..._newProduct(),
           ],
         ),
       ),
     );
   }
+
+  /// Поля новой карточки товара.
+  List<Widget> _newProduct() {
+    return [
+      const _Caption('Новый товар в UMAG'),
+      _Field(
+        label: 'Название',
+        value: _line.umagNewName,
+        hint: _line.name,
+        maxLines: null,
+        note: 'как товар будет называться в кабинете',
+        onChanged: (next) => _edit('umag_new_name', next),
+      ),
+      _Choice(
+        // Не «единица»: она уже есть выше, в самой строке накладной. Здесь то,
+        // чем кабинет отличает штучную карточку от весовой.
+        label: 'Тип товара',
+        value: _line.umagNewMeasure ?? 0,
+        options: const {0: 'Штучный', 1: 'Весовой', 2: 'Разливной'},
+        enabled: !_saving,
+        onChanged: (next) => _edit('umag_new_measure', '$next'),
+      ),
+      if (_categories.isNotEmpty)
+        _Choice(
+          label: 'Категория',
+          value: _line.umagNewCategoryId ?? _categories.first.id,
+          options: {
+            for (final category in _categories) category.id: category.name,
+          },
+          enabled: !_saving,
+          onChanged: (next) => _edit('umag_new_category_id', '$next'),
+        ),
+      _Field(
+        label: 'Цена продажи',
+        value: numberForInput(_line.umagNewSellingPrice),
+        hint: numberForInput(_line.price),
+        note: 'пусто — продаём по цене прихода',
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        onChanged: (next) =>
+            _edit('umag_new_selling_price', next, numeric: true),
+      ),
+    ];
+  }
+}
+
+/// Подпись над группой полей.
+class _Caption extends StatelessWidget {
+  const _Caption(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
+      child: Text(
+        text,
+        style: const TextStyle(fontSize: 13, color: Color(0xFFA3A3A3)),
+      ),
+    );
+  }
+}
+
+/// Выбор одного значения из списка — тем же рядом, что и поля.
+class _Choice extends StatelessWidget {
+  const _Choice({
+    required this.label,
+    required this.value,
+    required this.options,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final String label;
+  final int value;
+  final Map<int, String> options;
+  final bool enabled;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 110,
+            child: Text(
+              label,
+              style: const TextStyle(color: Color(0xFF737373)),
+            ),
+          ),
+          Expanded(
+            child: DropdownButtonFormField<int>(
+              initialValue: options.containsKey(value) ? value : null,
+              isExpanded: true,
+              decoration: InputDecoration(
+                isDense: true,
+                filled: true,
+                fillColor: const Color(0xFFF5F5F5),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 10,
+                ),
+                border: _border,
+                enabledBorder: _border,
+                focusedBorder: _border,
+                disabledBorder: _border,
+              ),
+              items: [
+                for (final option in options.entries)
+                  DropdownMenuItem<int>(
+                    value: option.key,
+                    child: Text(option.value, overflow: TextOverflow.ellipsis),
+                  ),
+              ],
+              onChanged: enabled
+                  ? (next) => next == null ? null : onChanged(next)
+                  : null,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Такая же серая заливка без рамки, как у правимых полей рядом.
+  OutlineInputBorder get _border => OutlineInputBorder(
+    borderRadius: BorderRadius.circular(6),
+    borderSide: BorderSide.none,
+  );
 }
 
 /// Строка «подпись — поле».

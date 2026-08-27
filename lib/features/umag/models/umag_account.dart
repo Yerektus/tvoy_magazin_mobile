@@ -9,6 +9,17 @@ class UmagStore {
   final String name;
 }
 
+/// Полка кабинета, куда кладут новый товар.
+class UmagCategory {
+  const UmagCategory({required this.id, required this.name});
+
+  factory UmagCategory.fromJson(Map<String, dynamic> json) =>
+      UmagCategory(id: json['id'] as int, name: (json['name'] ?? '') as String);
+
+  final int id;
+  final String name;
+}
+
 /// Подключение сотрудника к своему кабинету UMAG.
 ///
 /// Токена здесь нет и быть не может: сервер его наружу не отдаёт — это ключ от

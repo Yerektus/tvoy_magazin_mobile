@@ -458,6 +458,7 @@ class _DocumentDetailsPageState extends State<DocumentDetailsPage> {
       MaterialPageRoute(
         builder: (_) => LineDetailsPage(
           store: widget.store,
+          umag: widget.umag,
           invoiceId: widget.item.id,
           line: line,
         ),

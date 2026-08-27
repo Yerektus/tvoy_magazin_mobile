@@ -216,6 +216,11 @@ class DocumentLine {
     required this.total,
     required this.umagProductName,
     required this.umagConfidence,
+    required this.umagMissing,
+    required this.umagNewName,
+    required this.umagNewMeasure,
+    required this.umagNewCategoryId,
+    required this.umagNewSellingPrice,
   });
 
   factory DocumentLine.fromJson(Map<String, dynamic> json) => DocumentLine(
@@ -230,6 +235,11 @@ class DocumentLine {
     total: _decimal(json['total'] as String?),
     umagProductName: (json['umag_product_name'] ?? '') as String,
     umagConfidence: (json['umag_confidence'] as num?)?.toDouble(),
+    umagMissing: (json['umag_missing'] ?? false) as bool,
+    umagNewName: (json['umag_new_name'] ?? '') as String,
+    umagNewMeasure: json['umag_new_measure'] as int?,
+    umagNewCategoryId: json['umag_new_category_id'] as int?,
+    umagNewSellingPrice: _decimal(json['umag_new_selling_price'] as String?),
   );
 
   final int id;
@@ -252,6 +262,18 @@ class DocumentLine {
 
   /// Насколько уверенно строка сведена с товаром кабинета.
   final double? umagConfidence;
+
+  /// Такого товара в кабинете нет — карточку заведём при отправке. Что в ней
+  /// написать, человек указывает в полях ниже; пусто — возьмём с бумаги.
+  final bool umagMissing;
+
+  final String umagNewName;
+
+  /// 0 — штучный, 1 — весовой, 2 — разливной. Так их различает кабинет.
+  final int? umagNewMeasure;
+
+  final int? umagNewCategoryId;
+  final double? umagNewSellingPrice;
 
   static double? _decimal(String? raw) =>
       raw == null ? null : double.tryParse(raw);

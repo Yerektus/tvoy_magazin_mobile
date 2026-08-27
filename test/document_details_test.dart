@@ -29,6 +29,7 @@ class _FakeApi extends ApiClient {
 
   final int? supplyId;
   final List<String> posts = [];
+  final List<({String path, Object body})> patches = [];
   final List<String> deletes = [];
   int gets = 0;
 
@@ -81,6 +82,13 @@ class _FakeApi extends ApiClient {
     }
 
     return null;
+  }
+
+  @override
+  Future<dynamic> patch(String path, Object body) async {
+    patches.add((path: path, body: body));
+
+    return _invoice();
   }
 
   @override
@@ -148,6 +156,7 @@ class _FakeApi extends ApiClient {
     'supplier': 'ТОО «КАРАВАН»',
     'supplier_bin': '220340013017',
     'number': 'KBH0425963',
+    'issued_at': '2026-08-08',
     'total': '17086.00',
     'image': image,
     'images': images ?? [?image],
@@ -420,6 +429,28 @@ void main() {
     expect(button.onPressed, isNull);
 
     await tester.pumpAndSettle();
+  });
+
+  testWidgets('дату накладной правят из карточки', (tester) async {
+    // Кабинет не принимает приход раньше проведённой инвентаризации, а модель
+    // путает год: «2020» вместо «2026». Пока дату нельзя было поправить, такая
+    // накладная не уезжала вовсе.
+    final api = _FakeApi();
+    await pump(tester, api);
+
+    await tester.tap(find.text('08.08.2026'));
+    await tester.pumpAndSettle();
+
+    // Открылся выбор даты — в нём и правят.
+    expect(find.byType(DatePickerDialog), findsOneWidget);
+
+    // В тестовом окружении диалог англоязычный: делегаты локализации
+    // подключает `main`, а не карточка.
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+
+    // Ту же дату оставили — на сервер ходить незачем.
+    expect(api.patches, isEmpty);
   });
 
   testWidgets('позиции сворачиваются так же, как информация', (tester) async {

@@ -255,6 +255,41 @@ class _DocumentDetailsPageState extends State<DocumentDetailsPage> {
     }
   }
 
+  /// Поправить дату документа.
+  ///
+  /// Кабинет её проверяет: приход раньше проведённой инвентаризации он не
+  /// принимает, а модель нет-нет да и прочитает «2020» вместо «2026». Пока
+  /// дату нельзя было поправить, такая накладная не уезжала вовсе.
+  Future<void> _editDate() async {
+    final detail = _detail;
+
+    if (detail == null || _saving) {
+      return;
+    }
+
+    final today = DateTime.now();
+    final chosen = await showDatePicker(
+      context: context,
+      initialDate: detail.item.issuedAt ?? today,
+      // Год назад и день вперёд: накладную выписывают до привоза, но не
+      // будущим месяцем, а разбирают её через день-другой, не через годы.
+      firstDate: DateTime(today.year - 1, today.month, today.day),
+      lastDate: DateTime(today.year, today.month, today.day + 1),
+      helpText: 'Дата накладной',
+    );
+
+    if (chosen == null || !mounted || chosen == detail.item.issuedAt) {
+      return;
+    }
+
+    final iso =
+        '${chosen.year.toString().padLeft(4, '0')}-'
+        '${chosen.month.toString().padLeft(2, '0')}-'
+        '${chosen.day.toString().padLeft(2, '0')}';
+
+    await _editSupplier('issued_at', iso);
+  }
+
   /// Дописать позицию, которую модель пропустила.
   ///
   /// Строка заводится пустой и сразу открывается: одна она никому не нужна,
@@ -621,6 +656,11 @@ class _DocumentDetailsPageState extends State<DocumentDetailsPage> {
                           detail.item.issuedAt == null
                               ? '—'
                               : formatDate(detail.item.issuedAt!),
+                          onTap: _saving ? null : _editDate,
+                          // Иначе дата выглядит такой же справкой, как номер и
+                          // количество позиций, — и никто не догадается, что
+                          // её можно поправить.
+                          editable: true,
                         ),
                         _Row('Позиций', '${detail.lines.length}'),
                       ],
@@ -841,16 +881,27 @@ class _Section extends StatelessWidget {
 /// Строка «подпись — значение». Подпись слева фиксированной ширины, чтобы
 /// значения выстроились в один столбец и читались как таблица.
 class _Row extends StatelessWidget {
-  const _Row(this.label, this.value, {this.note, this.color, this.onTap});
+  const _Row(
+    this.label,
+    this.value, {
+    this.note,
+    this.color,
+    this.onTap,
+    this.editable = false,
+  });
 
   final String label;
   final String value;
   final String? note;
   final Color? color;
 
-  /// Задано — строка ведёт наружу, в чужой кабинет. Значение тогда рисуем
-  /// ссылкой: серый текст с иконкой сбоку выглядел бы как обычная справка.
+  /// Задано — по строке можно нажать: она либо ведёт наружу, в чужой кабинет,
+  /// либо открывает правку. Значение тогда рисуем не серой справкой.
   final VoidCallback? onTap;
+
+  /// Нажатие правит значение, а не уводит из приложения: вместо подчёркивания
+  /// ставим карандаш — так видно, что менять будут здесь же.
+  final bool editable;
 
   @override
   Widget build(BuildContext context) {
@@ -876,16 +927,33 @@ class _Row extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(
-                    value,
-                    textAlign: TextAlign.right,
-                    style: TextStyle(
-                      color: onTap == null ? color : const Color(0xFF0284C7),
-                      decoration: onTap == null
-                          ? null
-                          : TextDecoration.underline,
-                      decorationColor: const Color(0xFF0284C7),
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          value,
+                          textAlign: TextAlign.right,
+                          style: TextStyle(
+                            color: onTap == null
+                                ? color
+                                : const Color(0xFF0284C7),
+                            decoration: onTap == null || editable
+                                ? null
+                                : TextDecoration.underline,
+                            decorationColor: const Color(0xFF0284C7),
+                          ),
+                        ),
+                      ),
+                      if (editable) ...[
+                        const SizedBox(width: 6),
+                        const Icon(
+                          LucideIcons.pencil,
+                          size: 14,
+                          color: Color(0xFF0284C7),
+                        ),
+                      ],
+                    ],
                   ),
                   if (note != null)
                     Padding(
@@ -902,7 +970,9 @@ class _Row extends StatelessWidget {
                 ],
               ),
             ),
-            if (onTap != null)
+            // Стрелка «наружу» — только у строк, уводящих в чужой кабинет.
+            // У правимых на её месте карандаш, он стоит рядом со значением.
+            if (onTap != null && !editable)
               const Padding(
                 padding: EdgeInsets.only(left: 8),
                 child: Icon(

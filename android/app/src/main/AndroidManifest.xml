@@ -8,10 +8,15 @@
         android:label="tvoy_magazin_mobile"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <!-- Приложение живёт только вертикально: накладную держат в одной
+             руке, телефоном в другой снимают, и разворот экрана в этот момент
+             мешает. Сканера документов это не касается — он открывается своей
+             activity и ориентацией распоряжается сам. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
+            android:screenOrientation="portrait"
             android:taskAffinity=""
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"

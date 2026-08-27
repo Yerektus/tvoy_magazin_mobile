@@ -11,6 +11,7 @@ import '../../../shared/widgets/message.dart';
 import '../../umag/services/umag_store.dart';
 import '../models/document.dart';
 import '../models/shot.dart';
+import '../services/document_scanner.dart';
 import '../services/documents_store.dart';
 import 'capture_page.dart';
 import 'document_details_page.dart';
@@ -27,7 +28,16 @@ class DocumentsPage extends StatefulWidget {
   State<DocumentsPage> createState() => _DocumentsPageState();
 }
 
-class _DocumentsPageState extends State<DocumentsPage> {
+class _DocumentsPageState extends State<DocumentsPage>
+    with SingleTickerProviderStateMixin {
+  /// Вкладки ведёт `TabController`: он плавно возит подчёркивание и держит
+  /// выбранную, а самодельная полоса делала это руками и хуже.
+  late final TabController _tabs = TabController(
+    length: DocumentsTab.values.length,
+    initialIndex: DocumentsTab.values.indexOf(widget.store.tab),
+    vsync: this,
+  )..addListener(_onTabChanged);
+
   /// Гуляет отдельно от `store.isLoading`: тот про список, а не про то, что
   /// прямо сейчас грузится фото из галереи.
   bool _uploading = false;
@@ -52,7 +62,19 @@ class _DocumentsPageState extends State<DocumentsPage> {
   @override
   void dispose() {
     widget.store.removeListener(_onChanged);
+    _tabs.removeListener(_onTabChanged);
+    _tabs.dispose();
     super.dispose();
+  }
+
+  /// Список перечитываем один раз — когда вкладка доехала. Во время
+  /// переключения `index` меняется дважды, и запросов ушло бы столько же.
+  void _onTabChanged() {
+    if (_tabs.indexIsChanging) {
+      return;
+    }
+
+    widget.store.select(DocumentsTab.values[_tabs.index]);
   }
 
   void _onChanged() {
@@ -131,9 +153,36 @@ class _DocumentsPageState extends State<DocumentsPage> {
     }
   }
 
-  /// Список обновляет сам `DocumentsStore` после загрузки, поэтому здесь
-  /// остаётся только сказать, что снимок принят.
+  /// Снимает накладную.
+  ///
+  /// Сперва системным сканером документов: он сам ловит края листа и
+  /// выпрямляет перспективу, а модель читает такой снимок заметно лучше. На
+  /// телефоне без него — своей камерой, как раньше.
   Future<void> _openCamera() async {
+    const scanner = DocumentScanner();
+    List<Shot> shots;
+
+    try {
+      shots = await scanner.scan();
+    } on ScannerUnavailable catch (error) {
+      debugPrint('Сканер документов недоступен: ${error.message}');
+      await _openOwnCamera();
+      return;
+    }
+
+    // Сканер закрыли, ничего не сняв, — это отказ, а не ошибка.
+    if (shots.isEmpty || !mounted) {
+      return;
+    }
+
+    // Своего экрана проверки тут нет намеренно: системный сканер уже показал
+    // снятое, дал повернуть, обрезать и переснять. Второй такой же экран —
+    // лишнее нажатие на пути, который человек проходит по десять раз за приём.
+    await _send(shots);
+  }
+
+  /// Своя камера — запасной путь для телефонов без сканера документов.
+  Future<void> _openOwnCamera() async {
     final added = await Navigator.of(context).push<bool>(
       MaterialPageRoute(builder: (_) => CapturePage(store: widget.store)),
     );
@@ -143,24 +192,12 @@ class _DocumentsPageState extends State<DocumentsPage> {
     }
   }
 
-  Future<void> _pickFromGallery() async {
-    final file = await ImagePicker().pickImage(source: ImageSource.gallery);
-
-    // Открыли галерею и передумали — не ошибка, а обычный отказ.
-    if (file == null) {
-      return;
-    }
-
+  /// Отправляет снятые листы одной накладной.
+  Future<void> _send(List<Shot> shots) async {
     setState(() => _uploading = true);
 
     try {
-      await widget.store.upload([
-        Shot(
-          bytes: await file.readAsBytes(),
-          filename: file.name,
-          contentType: _contentTypeOf(file),
-        ),
-      ]);
+      await widget.store.upload(shots);
 
       if (mounted) {
         _announceUploaded();
@@ -178,6 +215,23 @@ class _DocumentsPageState extends State<DocumentsPage> {
         setState(() => _uploading = false);
       }
     }
+  }
+
+  Future<void> _pickFromGallery() async {
+    final file = await ImagePicker().pickImage(source: ImageSource.gallery);
+
+    // Открыли галерею и передумали — не ошибка, а обычный отказ.
+    if (file == null) {
+      return;
+    }
+
+    await _send([
+      Shot(
+        bytes: await file.readAsBytes(),
+        filename: file.name,
+        contentType: _contentTypeOf(file),
+      ),
+    ]);
   }
 
   /// Выкинуть накладную из списка.
@@ -242,20 +296,14 @@ class _DocumentsPageState extends State<DocumentsPage> {
 
     return Scaffold(
       appBar: AppBar(
-        // Без черты снизу: сразу под шапкой стоят вкладки, они белые и своей
-        // чертой отделены от списка. Две линии подряд читались как рамка
-        // вокруг пустой полосы.
+        // Без черты снизу: под шапкой стоят вкладки, они белые и своей чертой
+        // отделены от списка. Две линии подряд читались как рамка вокруг
+        // пустой полосы.
         title: const Text('Документы'),
         shape: const Border(),
+        bottom: _Tabs(controller: _tabs),
       ),
-      body: Column(
-        children: [
-          _Tabs(store: store),
-          Expanded(
-            child: RefreshIndicator(onRefresh: store.load, child: _body(store)),
-          ),
-        ],
-      ),
+      body: RefreshIndicator(onRefresh: store.load, child: _body(store)),
       floatingActionButton: FloatingActionButton(
         key: _fabKey,
         heroTag: 'add',
@@ -398,94 +446,62 @@ class _DayHeader extends StatelessWidget {
   }
 }
 
-/// Полоса вкладок под панелью.
+/// Полоса вкладок под шапкой.
 ///
-/// Прокручивается вбок: вкладок три, но названия длинные, и на узком экране
-/// они не помещаются в ряд.
-class _Tabs extends StatelessWidget {
-  const _Tabs({required this.store});
+/// Обычный `TabBar`: плавное подчёркивание, правильные размеры нажатия и
+/// поведение, к которому человек привык в других приложениях, — самодельная
+/// полоса всё это повторяла руками и хуже. Настройками приводим его к нашему
+/// виду: наш синий, серые невыбранные, подчёркивание во всю ширину вкладки.
+///
+/// Смахивания между вкладками нет намеренно: под ними не три готовых списка, а
+/// один, который перечитывается с сервера с новым отбором. Тянуть пальцем то,
+/// что появится через полсекунды, — обман.
+class _Tabs extends StatelessWidget implements PreferredSizeWidget {
+  const _Tabs({required this.controller});
 
-  final DocumentsStore store;
+  final TabController controller;
+
+  /// Высота полосы. Вкладки — это управление, а не содержимое: чем меньше они
+  /// откусывают у списка, тем лучше. Сорока двух точек хватает, чтобы попасть
+  /// пальцем.
+  static const double height = 42;
+
+  @override
+  Size get preferredSize => const Size.fromHeight(height);
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        // Полоса вкладок и список одинаково белые и без черты сливаются —
-        // непонятно, где кончается управление и начинаются документы. Эта же
-        // черта служит дорожкой, по которой едет подчёркивание выбранной.
-        border: Border(bottom: BorderSide(color: Color(0xFFE5E5E5))),
-      ),
-      // Вкладки делят ширину поровну: подчёркивание тогда показывает не только
-      // выбранную вкладку, но и какую долю списка она отбирает. Прокрутки нет —
-      // вкладок три, и все подписи короткие.
-      child: Row(
-        children: [
+    return ColoredBox(
+      color: Colors.white,
+      child: TabBar(
+        controller: controller,
+        // Вкладки делят ширину поровну: подчёркивание тогда показывает не
+        // только выбранную, но и какую долю списка она отбирает.
+        labelColor: accentDark,
+        unselectedLabelColor: const Color(0xFF737373),
+        labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        unselectedLabelStyle: const TextStyle(fontSize: 14),
+        indicatorColor: accentDark,
+        indicatorWeight: 2,
+        indicatorSize: TabBarIndicatorSize.tab,
+        // Черта под полосой: она белая, и без неё непонятно, где кончается
+        // управление и начинаются документы. Эта же черта служит дорожкой, по
+        // которой едет подчёркивание.
+        dividerColor: const Color(0xFFE5E5E5),
+        dividerHeight: 1,
+        splashBorderRadius: BorderRadius.circular(6),
+        tabs: [
           for (final tab in DocumentsTab.values)
-            Expanded(
-              child: _Tab(
-                label: tab.label,
-                selected: store.tab == tab,
-                onSelected: () => store.select(tab),
-              ),
+            Tab(
+              // Черта под полосой прибавляется к высоте вкладки — вычитаем её,
+              // чтобы полоса целиком осталась той, что обещает `preferredSize`.
+              height: height - 2,
+              // На узких экранах треть ширины короче слова «Проверенные», и
+              // подпись обрезалась бы. Уменьшить её лучше, чем показать
+              // половину.
+              child: FittedBox(fit: BoxFit.scaleDown, child: Text(tab.label)),
             ),
         ],
-      ),
-    );
-  }
-}
-
-/// Вкладка списка.
-///
-/// Подчёркивание, а не пилюля — как в веб-кабинете. У пилюль каждая вкладка
-/// была обведена рамкой, и три обведённых овала спорили с карточками
-/// документов под ними: глаз считал их за одинаковые по важности. Подчёркнута
-/// только выбранная, остальные — просто текст.
-class _Tab extends StatelessWidget {
-  const _Tab({
-    required this.label,
-    required this.selected,
-    required this.onSelected,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onSelected,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 9),
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(
-              // Прозрачная полоса у невыбранных, а не отсутствие полосы: иначе
-              // высота вкладок отличалась бы на два пикселя и текст дёргался
-              // при переключении.
-              color: selected ? accentDark : Colors.transparent,
-              width: 2,
-            ),
-          ),
-        ),
-        // На узких экранах треть ширины короче слова «Проверенные», и подпись
-        // обрезалась бы. Уменьшить её лучше, чем показать половину.
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              color: selected ? accentDark : const Color(0xFF737373),
-              fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-            ),
-          ),
-        ),
       ),
     );
   }

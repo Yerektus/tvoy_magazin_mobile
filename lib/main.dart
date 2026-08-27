@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'features/auth/pages/login_page.dart';
@@ -12,6 +13,13 @@ import 'shared/services/api_client.dart';
 import 'shared/widgets/app_theme.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Приложение живёт только вертикально: накладную держат в одной руке, а
+  // телефоном в другой снимают, и разворот экрана в этот момент — помеха. Свои
+  // экраны камеры и сканера ориентацией распоряжаются сами.
+  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+
   final api = ApiClient();
 
   runApp(

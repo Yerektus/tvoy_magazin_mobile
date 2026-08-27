@@ -46,6 +46,9 @@ dependencies:
   flutter_markdown_plus: ^1.0.12
   mobile_scanner: ^7.4.0
   flutter_slidable: ^4.0.3
+  image: ^4.9.2
+  flutter_doc_scanner: ^0.0.21
+  content_resolver: ^0.3.6
 dev_dependencies:
   flutter_test:
     sdk: flutter

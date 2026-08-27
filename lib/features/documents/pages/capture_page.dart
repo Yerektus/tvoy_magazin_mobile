@@ -1,6 +1,8 @@
 import 'package:camera/camera.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
+import 'package:image/image.dart' as img;
 
 import '../../../shared/services/api_exception.dart';
 import '../../../shared/widgets/error_dialog.dart';
@@ -78,8 +80,10 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
       final camera = CameraController(
         back.isNotEmpty ? back.first : cameras.first,
         // Накладная — это мелкий текст: на среднем разрешении строки
-        // рассыпаются, и модель начинает путать цифры.
-        ResolutionPreset.high,
+        // рассыпаются, и модель начинает путать цифры. `high` — это 720p,
+        // на нём и рассыпались; берём столько, сколько даёт камера, а лишнее
+        // срежем сами перед отправкой.
+        ResolutionPreset.max,
         enableAudio: false,
       );
 
@@ -111,9 +115,13 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
 
     setState(() => _sending = true);
 
+    // Соотношение той области, в которой человек видит кадр: по ней и режем.
+    final screen = MediaQuery.sizeOf(context);
+    final ratio = screen.width / screen.height;
+
     try {
       final shot = await camera.takePicture();
-      final bytes = await shot.readAsBytes();
+      final bytes = await _fit(await shot.readAsBytes(), ratio);
 
       if (mounted) {
         setState(() {
@@ -139,6 +147,23 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
       if (mounted) {
         setState(() => _sending = false);
       }
+    }
+  }
+
+  /// Приводит снимок к тому, что человек видел в кадре.
+  ///
+  /// Предпросмотр показывает кадр обрезанным по краям (`BoxFit.cover`), а
+  /// камера отдаёт его целиком — и на фотографии документ оказывается дальше и
+  /// мельче, чем был на экране. Режем по центру под то же соотношение, а заодно
+  /// ужимаем: снимать с полным разрешением нужно ради мелкого текста, а везти
+  /// двенадцать мегапикселей по мобильной сети — нет.
+  Future<Uint8List> _fit(Uint8List bytes, double ratio) async {
+    try {
+      return await compute(_fitFrame, (bytes: bytes, ratio: ratio));
+    } catch (error) {
+      // Не срослось — отправляем как снято: целый кадр лучше, чем никакого.
+      debugPrint('Кадр не обрезался: $error');
+      return bytes;
     }
   }
 
@@ -246,6 +271,62 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
       ],
     );
   }
+}
+
+/// Насколько большим отправляем снимок. Сервер всё равно ужимает до 2200, но
+/// запас на его собственную обрезку полей не помешает.
+const _maxSide = 2400;
+
+/// Обрезка и сжатие в отдельном потоке: двенадцать мегапикселей в главном
+/// подвешивают экран на секунду с лишним.
+Uint8List _fitFrame(({Uint8List bytes, double ratio}) frame) {
+  final decoded = img.decodeImage(frame.bytes);
+
+  if (decoded == null) {
+    return frame.bytes;
+  }
+
+  // Телефон пишет ориентацию в EXIF, а не поворачивает пиксели: без этого
+  // портретный снимок пришёл бы лежащим на боку, и резали бы мы не то.
+  final upright = img.bakeOrientation(decoded);
+  final cropped = cropToRatio(upright, frame.ratio);
+  final longest = cropped.width > cropped.height
+      ? cropped.width
+      : cropped.height;
+
+  final sized = longest > _maxSide
+      ? img.copyResize(
+          cropped,
+          width: cropped.width >= cropped.height ? _maxSide : null,
+          height: cropped.height > cropped.width ? _maxSide : null,
+          interpolation: img.Interpolation.average,
+        )
+      : cropped;
+
+  return img.encodeJpg(sized, quality: 90);
+}
+
+/// Центральная часть кадра с нужным соотношением сторон.
+@visibleForTesting
+img.Image cropToRatio(img.Image image, double ratio) {
+  final current = image.width / image.height;
+
+  if ((current - ratio).abs() < 0.01) {
+    return image;
+  }
+
+  // Кадр шире нужного — режем по бокам, уже — сверху и снизу. Ровно это и
+  // делает предпросмотр, растянутый с обрезкой.
+  final width = current > ratio ? (image.height * ratio).round() : image.width;
+  final height = current > ratio ? image.height : (image.width / ratio).round();
+
+  return img.copyCrop(
+    image,
+    x: ((image.width - width) / 2).round(),
+    y: ((image.height - height) / 2).round(),
+    width: width,
+    height: height,
+  );
 }
 
 /// Нижний ряд экрана съёмки: спуск, а рядом — что делать со снятым.

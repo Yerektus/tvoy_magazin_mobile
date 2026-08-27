@@ -650,21 +650,43 @@ void main() {
     final screen =
         tester.view.physicalSize.width / tester.view.devicePixelRatio;
 
-    // Номер и дата — подписи слева разной длины, значения должны кончаться на
-    // одной вертикали, а не начинаться лесенкой.
-    final number = tester.getBottomRight(find.text('KBH0425963'));
+    // Подписи слева разной длины, значения должны кончаться на одной вертикали,
+    // а не начинаться лесенкой.
+    final lines = tester.getBottomRight(find.text('Позиций'));
     final status = tester.getBottomRight(find.text('Проверено'));
 
     expect(
-      number.dx,
-      closeTo(status.dx, 1),
-      reason: 'значения не выстроены по правому краю',
-    );
-    expect(
-      number.dx,
+      status.dx,
       greaterThan(screen / 2),
       reason: 'значения остались слева',
     );
+    expect(
+      lines.dx,
+      lessThan(status.dx),
+      reason: 'подпись должна стоять слева от значения',
+    );
+  });
+
+  testWidgets('номер накладной правится прямо в карточке', (tester) async {
+    // Номер уходит в комментарий приёмки, по нему её и ищут в кабинете, а с
+    // бумаги он читается через раз: печать бледная, рядом номера счёта и
+    // договора.
+    final api = _FakeApi();
+    await pump(tester, api);
+
+    final field = find.ancestor(
+      of: find.text('Номер'),
+      matching: find.byType(Row),
+    );
+
+    await tester.enterText(
+      find.descendant(of: field.first, matching: find.byType(TextField)),
+      '00788712',
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+
+    expect(api.patches.first.body, {'number': '00788712'});
   });
 
   testWidgets('общую информацию можно свернуть и развернуть', (tester) async {

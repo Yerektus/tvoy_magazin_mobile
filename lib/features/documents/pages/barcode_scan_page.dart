@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
@@ -37,12 +39,53 @@ class _BarcodeScanPageState extends State<BarcodeScanPage> {
       BarcodeFormat.code128,
     ],
     detectionSpeed: DetectionSpeed.noDuplicates,
+    // Штрихкод на пакете сока — это полоски шириной в треть миллиметра, и на
+    // низком разрешении они сливаются. Просим полное HD, но только на айфоне:
+    // на андроиде CameraX подбирает размер сам под возможности камеры, а
+    // навязанный размер он молча заменяет ближайшим — и кадр анализа перестаёт
+    // совпадать с тем, что видно на экране.
+    cameraResolution: Platform.isIOS ? const Size(1920, 1080) : null,
+    // Код мелкий и телефон держат в полуметре — камера подтягивает его сама.
+    // Работает только на андроиде; на айфоне ту же задачу решает объектив
+    // ближней съёмки, см. `_useCloseRangeLens`.
+    autoZoom: true,
   );
 
   /// Код уже прочитан и страница закрывается. Без этого камера успевает
   /// прислать второй кадр с тем же кодом, и `pop` уходит дважды — вместе с
   /// экраном закрывается и карточка позиции под ним.
   bool _done = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _useCloseRangeLens();
+  }
+
+  /// Переключается на объектив, которым лучше видно вблизи.
+  ///
+  /// У новых айфонов таких несколько, и обычный на расстоянии ладони не
+  /// наводится: кадр плывёт, а полоски штрихкода не разделяются. Ультраширокий
+  /// с макро на этой дистанции читает сразу. Не вышло — остаёмся на обычном:
+  /// сканер и с ним работает, просто хуже.
+  Future<void> _useCloseRangeLens() async {
+    try {
+      final best = await _controller.getBestCloseRangeScanningLens();
+      final supported = await _controller.getSupportedLenses(
+        facing: CameraFacing.back,
+      );
+
+      if (best == null || !supported.contains(best) || !mounted) {
+        return;
+      }
+
+      await _controller.switchCamera(
+        SelectCamera(facingDirection: CameraFacing.back, lensType: best),
+      );
+    } on MobileScannerException catch (error) {
+      debugPrint('Ближний объектив недоступен: ${error.errorCode}');
+    }
+  }
 
   @override
   void dispose() {
@@ -98,6 +141,9 @@ class _BarcodeScanPageState extends State<BarcodeScanPage> {
             children: [
               MobileScanner(
                 controller: _controller,
+                // Тап наводит фокус: на андроиде камера с автофокусом норовит
+                // поймать полку за спиной, а не этикетку в руке.
+                tapToFocus: true,
                 // Читаем только то, что попало в окно: на полке рядом стоят
                 // соседние коробки, и без окна сканер хватает их штрихкоды.
                 scanWindow: window,
@@ -140,12 +186,15 @@ class _BarcodeScanPageState extends State<BarcodeScanPage> {
   /// Окно сканирования: широкое и низкое — такой и есть полоска штрихкода.
   /// Стоит выше середины, чтобы читаемое не закрывала рука с телефоном.
   Rect _window(BuildContext context, BoxConstraints constraints) {
-    final width = constraints.maxWidth * 0.8;
+    final width = constraints.maxWidth * 0.92;
 
     return Rect.fromCenter(
       center: Offset(constraints.maxWidth / 2, constraints.maxHeight * 0.42),
       width: width,
-      height: (width * 0.55).clamp(120.0, 220.0),
+      // Окно широкое и высокое: узкое требовало прицеливаться, а штрихкод на
+      // коробке лежит то вдоль, то поперёк, и промах по окну человек читает
+      // как «сканер не работает».
+      height: (width * 0.75).clamp(160.0, 320.0),
     );
   }
 }

@@ -648,20 +648,26 @@ class _DocumentDetailsPageState extends State<DocumentDetailsPage> {
                     _Section(
                       title: 'Документ',
                       children: [
-                        _Row(
-                          'Номер',
-                          detail.item.number.isEmpty ? '—' : detail.item.number,
+                        // Номер правится руками: он уходит в комментарий
+                        // приёмки, по нему её и ищут в кабинете, а с бумаги
+                        // читается через раз — печать бледная, а рядом стоят
+                        // номера счёта и договора.
+                        _Field(
+                          label: 'Номер',
+                          value: detail.item.number,
+                          hint: 'как в накладной',
+                          onChanged: (next) => _editSupplier('number', next),
                         ),
-                        _Row(
-                          'Дата накладной',
-                          detail.item.issuedAt == null
-                              ? '—'
+                        // Дата — не справка, а правимое значение, поэтому
+                        // выглядит полем, как название поставщика рядом.
+                        // Клавиатуры при этом нет: дату выбирают в календаре,
+                        // а не набирают цифрами с точками.
+                        _DateField(
+                          label: 'Дата накладной',
+                          value: detail.item.issuedAt == null
+                              ? ''
                               : formatDate(detail.item.issuedAt!),
                           onTap: _saving ? null : _editDate,
-                          // Иначе дата выглядит такой же справкой, как номер и
-                          // количество позиций, — и никто не догадается, что
-                          // её можно поправить.
-                          editable: true,
                         ),
                         _Row('Позиций', '${detail.lines.length}'),
                       ],
@@ -882,27 +888,16 @@ class _Section extends StatelessWidget {
 /// Строка «подпись — значение». Подпись слева фиксированной ширины, чтобы
 /// значения выстроились в один столбец и читались как таблица.
 class _Row extends StatelessWidget {
-  const _Row(
-    this.label,
-    this.value, {
-    this.note,
-    this.color,
-    this.onTap,
-    this.editable = false,
-  });
+  const _Row(this.label, this.value, {this.note, this.color, this.onTap});
 
   final String label;
   final String value;
   final String? note;
   final Color? color;
 
-  /// Задано — по строке можно нажать: она либо ведёт наружу, в чужой кабинет,
-  /// либо открывает правку. Значение тогда рисуем не серой справкой.
+  /// Задано — строка ведёт наружу, в чужой кабинет. Значение тогда рисуем
+  /// ссылкой: серый текст с иконкой сбоку выглядел бы как обычная справка.
   final VoidCallback? onTap;
-
-  /// Нажатие правит значение, а не уводит из приложения: вместо подчёркивания
-  /// ставим карандаш — так видно, что менять будут здесь же.
-  final bool editable;
 
   @override
   Widget build(BuildContext context) {
@@ -928,33 +923,16 @@ class _Row extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Flexible(
-                        child: Text(
-                          value,
-                          textAlign: TextAlign.right,
-                          style: TextStyle(
-                            color: onTap == null
-                                ? color
-                                : const Color(0xFF0284C7),
-                            decoration: onTap == null || editable
-                                ? null
-                                : TextDecoration.underline,
-                            decorationColor: const Color(0xFF0284C7),
-                          ),
-                        ),
-                      ),
-                      if (editable) ...[
-                        const SizedBox(width: 6),
-                        const Icon(
-                          LucideIcons.pencil,
-                          size: 14,
-                          color: Color(0xFF0284C7),
-                        ),
-                      ],
-                    ],
+                  Text(
+                    value,
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      color: onTap == null ? color : const Color(0xFF0284C7),
+                      decoration: onTap == null
+                          ? null
+                          : TextDecoration.underline,
+                      decorationColor: const Color(0xFF0284C7),
+                    ),
                   ),
                   if (note != null)
                     Padding(
@@ -971,9 +949,7 @@ class _Row extends StatelessWidget {
                 ],
               ),
             ),
-            // Стрелка «наружу» — только у строк, уводящих в чужой кабинет.
-            // У правимых на её месте карандаш, он стоит рядом со значением.
-            if (onTap != null && !editable)
+            if (onTap != null)
               const Padding(
                 padding: EdgeInsets.only(left: 8),
                 child: Icon(
@@ -984,6 +960,78 @@ class _Row extends StatelessWidget {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Строка с датой: выглядит полем, а открывает календарь.
+///
+/// Полем — чтобы её не принимали за справку вроде номера или числа позиций.
+/// Календарём — потому что дата с клавиатуры набирается медленнее и с
+/// опечатками вроде «18.13.2026».
+class _DateField extends StatelessWidget {
+  const _DateField({
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
+
+  final String label;
+  final String value;
+
+  /// Пусто — прямо сейчас с накладной что-то делают, и правка подождёт.
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 140,
+            child: Text(
+              label,
+              style: const TextStyle(color: Color(0xFF737373)),
+            ),
+          ),
+          Expanded(
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(6),
+              child: Container(
+                decoration: BoxDecoration(
+                  // Та же серая заливка без рамки, что у правимых полей рядом.
+                  color: const Color(0xFFF5F5F5),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 10,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        value.isEmpty ? 'дд.мм.гггг' : value,
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: value.isEmpty ? const Color(0xFFA3A3A3) : null,
+                        ),
+                      ),
+                    ),
+                    const Icon(
+                      LucideIcons.calendar,
+                      size: 18,
+                      color: Color(0xFF737373),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

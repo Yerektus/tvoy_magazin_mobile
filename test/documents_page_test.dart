@@ -60,25 +60,19 @@ void main() {
   testWidgets('вкладки делят ширину поровну', (tester) async {
     await pump(tester);
 
-    final widths = [
-      for (final label in ['Все', 'Ожидают', 'Проверенные'])
-        tester
-            .getSize(
-              find.ancestor(
-                of: find.text(label),
-                matching: find.byType(AnimatedContainer),
-              ),
-            )
-            .width,
-    ];
-
-    expect(widths[0], closeTo(widths[1], 0.5));
-    expect(widths[1], closeTo(widths[2], 0.5));
-
-    // И вместе занимают всю ширину экрана, а не жмутся слева.
     final screen =
         tester.view.physicalSize.width / tester.view.devicePixelRatio;
-    expect(widths.reduce((a, b) => a + b), closeTo(screen, 1));
+    final centers = [
+      for (final label in ['Все', 'Ожидают', 'Проверенные'])
+        tester.getCenter(find.text(label)).dx,
+    ];
+
+    // Три равные доли — значит середины вкладок стоят на одной шестой, трёх
+    // шестых и пяти шестых ширины. Так подчёркивание показывает не только
+    // выбранную вкладку, но и какую долю списка она отбирает.
+    expect(centers[0], closeTo(screen / 6, 1));
+    expect(centers[1], closeTo(screen / 2, 1));
+    expect(centers[2], closeTo(screen * 5 / 6, 1));
   });
 
   testWidgets('подписи не обрезаются на узком экране', (tester) async {
@@ -231,14 +225,7 @@ void main() {
   testWidgets('полоса вкладок не занимает лишней высоты', (tester) async {
     await pump(tester);
 
-    final tabs = tester.getSize(
-      find
-          .ancestor(
-            of: find.text('Все'),
-            matching: find.byType(AnimatedContainer),
-          )
-          .first,
-    );
+    final tabs = tester.getSize(find.byType(TabBar));
 
     // Вкладки — это управление, а не содержимое: чем меньше они откусывают у
     // списка, тем лучше. Сорок точек хватает, чтобы попасть пальцем.

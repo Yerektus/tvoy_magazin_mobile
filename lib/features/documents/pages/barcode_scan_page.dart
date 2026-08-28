@@ -1,10 +1,10 @@
-import 'dart:io';
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import '../../../shared/widgets/back_label.dart';
 import '../../../shared/widgets/app_theme.dart';
 import '../../../shared/widgets/message.dart';
 
@@ -44,7 +44,11 @@ class _BarcodeScanPageState extends State<BarcodeScanPage> {
     // на андроиде CameraX подбирает размер сам под возможности камеры, а
     // навязанный размер он молча заменяет ближайшим — и кадр анализа перестаёт
     // совпадать с тем, что видно на экране.
-    cameraResolution: Platform.isIOS ? const Size(1920, 1080) : null,
+    // `defaultTargetPlatform`, а не `Platform`: тот живёт в `dart:io`, которого
+    // в браузере нет, и из-за него не собиралось всё приложение.
+    cameraResolution: defaultTargetPlatform == TargetPlatform.iOS
+        ? const Size(1920, 1080)
+        : null,
     // Код мелкий и телефон держат в полуметре — камера подтягивает его сама.
     // Работает только на андроиде; на айфоне ту же задачу решает объектив
     // ближней съёмки, см. `_useCloseRangeLens`.
@@ -122,7 +126,9 @@ class _BarcodeScanPageState extends State<BarcodeScanPage> {
         // Белая, как везде в приложении. Прозрачная поверх кадра выглядела
         // отдельным экраном из чужой программы, а чёрное на чёрном ещё и
         // сливалось: было не понять, где кончается шапка и начинается камера.
-        title: const Text('Штрихкод'),
+        titleSpacing: 4,
+        automaticallyImplyLeading: false,
+        title: const BackLabel('Позиция'),
         // Пустая рамка, а не `null`: `null` означает «взять из темы», а в теме
         // черта под шапкой есть. Здесь она лишняя — под шапкой тёмный кадр, он
         // отделён и так.

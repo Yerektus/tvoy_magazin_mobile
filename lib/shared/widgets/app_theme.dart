@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 
 /// Свой цвет приложения — тот же, что в веб-кабинете: там это `sky-500`, и
 /// одно действие не должно быть в двух местах разного цвета.
@@ -12,6 +13,10 @@ const Color accentDark = Color(0xFF0284C7);
 
 /// Бледный оттенок того же цвета — подложка под выбранным разделом меню.
 const Color accentPale = Color(0xFFF0F9FF);
+
+/// Высота шапки. Выше стандартных 56: заголовок и кнопка действия стоят в один
+/// ряд, и на тесной полосе они жались друг к другу.
+const double appBarHeight = 64;
 
 /// Оформление под веб-кабинет: белая шапка, нейтральный фон, скруглений мало.
 ThemeData buildTheme() {
@@ -28,7 +33,14 @@ ThemeData buildTheme() {
     // разный, и одни и те же экраны выглядели по-разному на двух телефонах.
     fontFamily: 'Inter',
     scaffoldBackgroundColor: const Color(0xFFFAFAFA),
+    // Назад — тонким шевроном, а не стрелкой: он легче и не спорит с иконками
+    // действий справа, которые у нас той же линейной рисовки.
+    actionIconTheme: ActionIconThemeData(
+      backButtonIconBuilder: (context) =>
+          const Icon(LucideIcons.chevron_left, size: 26),
+    ),
     appBarTheme: const AppBarTheme(
+      toolbarHeight: appBarHeight,
       backgroundColor: Colors.white,
       foregroundColor: Color(0xFF171717),
       elevation: 0,

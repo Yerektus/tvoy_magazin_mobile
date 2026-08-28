@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../shared/widgets/back_label.dart';
+
 /// Листы накладной во весь экран.
 ///
 /// Единственное, ради чего их открывают, — прочитать бумагу: сверить цифру,
@@ -37,7 +39,9 @@ class _PhotoPageState extends State<PhotoPage> {
       appBar: AppBar(
         // Белая, как везде: чёрная шапка над чёрным полем сливалась с ним, и
         // её приходилось искать по белой черте снизу.
-        title: Text(widget.title, style: const TextStyle(fontSize: 16)),
+        titleSpacing: 4,
+        automaticallyImplyLeading: false,
+        title: const BackLabel('Накладная'),
         // Черту из общей темы убираем: под шапкой чёрное поле, оно отделено
         // и так. Пустая рамка, а не `null`: `null` берёт черту из темы.
         shape: const Border(),

@@ -7,6 +7,8 @@ import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 
 import '../../../shared/services/api_exception.dart';
+import '../../../shared/widgets/back_label.dart';
+import '../../../shared/widgets/app_theme.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
 import '../../../shared/widgets/error_dialog.dart';
 import '../../../shared/widgets/inline_field.dart';
@@ -255,6 +257,27 @@ class _DocumentDetailsPageState extends State<DocumentDetailsPage> {
     }
   }
 
+  /// Показывает итог накладной.
+  ///
+  /// Листом, а не строкой внизу экрана: сумму сверяют с бумагой один раз, а
+  /// место она занимала всегда. Здесь же рядом стоит и число позиций — эти два
+  /// числа и сверяют вместе.
+  Future<void> _showTotal() async {
+    final detail = _detail;
+
+    if (detail == null) {
+      return;
+    }
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      showDragHandle: true,
+      builder: (_) =>
+          _TotalSheet(total: detail.item.total, lines: detail.lines.length),
+    );
+  }
+
   /// Поправить дату документа.
   ///
   /// Кабинет её проверяет: приход раньше проведённой инвентаризации он не
@@ -472,9 +495,6 @@ class _DocumentDetailsPageState extends State<DocumentDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Итог берём из свежих данных, а пока они едут — из строки списка.
-    final total = _detail?.item.total ?? widget.item.total;
-
     final photos = _detail?.photos ?? const <String>[];
     final action = _action;
 
@@ -482,30 +502,26 @@ class _DocumentDetailsPageState extends State<DocumentDetailsPage> {
       appBar: AppBar(
         // Номера накладных длинные, и полноразмерный заголовок обрезается
         // многоточием уже на середине — мельче он помещается целиком.
-        title: Text(widget.item.title, style: const TextStyle(fontSize: 16)),
-        actions: [
-          IconButton(
-            onPressed: _saving ? null : _retry,
-            icon: const Icon(LucideIcons.scan_text),
-            tooltip: 'Распознать заново',
-          ),
-          // Снимок — в шапке: смотреть бумагу нужно на любом шаге, а внизу
-          // кнопка делила место с главным действием и была вдвое уже него,
-          // хотя нажимают её не реже.
-          //
-          // Кнопки нет вовсе, когда нет снимка: у накладных, залитых до того,
-          // как мы стали хранить оригинал, открывать нечего.
-          if (photos.isNotEmpty)
-            IconButton(
-              onPressed: _openPhoto,
-              icon: const Icon(LucideIcons.image),
-              tooltip: 'Открыть снимок',
-            ),
-          const SizedBox(width: 4),
-        ],
+        // Следующий шаг — в шапке справа: он на экране один, и место у правого
+        // края под него и держат. Полосой под шапкой он занимал целую строку
+        // ради одной кнопки.
+        //
+        // Кнопка стоит в строке заголовка, а не в `actions`: там она рисуется,
+        // но нажатия до неё не доходят — человек тычет в мёртвое место. Здесь
+        // обе части делят ширину честно: заголовок ужимается многоточием,
+        // кнопка занимает столько, сколько просит.
+        // Заголовка нет: «Накладная от 27.08.2026» повторяло дату, которая
+        // стоит строкой ниже, и ужималось в многоточие, отбирая место у
+        // единственной кнопки. В шапке остаётся то, ради чего сюда смотрят, —
+        // следующий шаг.
+        titleSpacing: 4,
+        automaticallyImplyLeading: false,
+        title: Row(
+          children: [const BackLabel('Документы'), const Spacer(), ?action],
+        ),
         // Место под полоску работы держим всегда. Раньше она появлялась и
-        // исчезала вместе с высотой шапки, и всё под ней — вместе с кнопкой
-        // действия — дёргалось вниз-вверх на два пикселя.
+        // исчезала вместе с высотой шапки, и всё под ней дёргалось вниз-вверх
+        // на два пикселя.
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(2),
           child: _saving
@@ -513,19 +529,26 @@ class _DocumentDetailsPageState extends State<DocumentDetailsPage> {
               : const SizedBox(height: 2),
         ),
       ),
-      body: Column(
+      // Полоса действий лежит поверх списка, а не в `bottomNavigationBar`: тот
+      // отрезает себе полосу экрана насовсем, и под накладную остаётся меньше.
+      // Здесь список идёт до самого низа, а полоса висит над ним.
+      body: Stack(
         children: [
-          // Следующий шаг — сразу под шапкой и не прокручивается: список
-          // позиций длинный, и до кнопки внизу приходилось долистывать.
-          if (action != null) _ActionBar(child: action),
-          Expanded(
-            child: RefreshIndicator(onRefresh: _load, child: _body()),
+          RefreshIndicator(onRefresh: _load, child: _body()),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _Toolbar(
+              onRetry: _saving ? null : _retry,
+              onTotal: _detail == null ? null : _showTotal,
+              // Снимка нет у накладных, залитых до того, как мы стали хранить
+              // оригинал: открывать там нечего.
+              onPhoto: photos.isEmpty ? null : _openPhoto,
+            ),
           ),
         ],
       ),
-      // Итог внизу, всегда на виду: сумму сверяют с бумагой чаще прочего, а
-      // прокрутив длинный список позиций, человек потерял бы её.
-      bottomNavigationBar: _BottomBar(total: total),
     );
   }
 
@@ -541,6 +564,23 @@ class _DocumentDetailsPageState extends State<DocumentDetailsPage> {
       return null;
     }
 
+    // В шапке кнопка живёт по своим размерам: в общей теме у `FilledButton`
+    // задана высота через `Size.fromHeight`, а это бесконечная ширина — в
+    // строке шапки такую разложить нельзя.
+    final compact = FilledButton.styleFrom(
+      minimumSize: const Size(0, 40),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      shape: const StadiumBorder(),
+      textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+      // Кнопка второстепенная: бледная заливка своего цвета вместо сплошной
+      // синей. Залитая тянула на себя весь экран, хотя карточку открывают
+      // ради строк накладной, а не ради неё.
+      backgroundColor: accentPale,
+      foregroundColor: accentDark,
+      disabledBackgroundColor: const Color(0xFFF5F5F5),
+      disabledForegroundColor: const Color(0xFFA3A3A3),
+    );
+
     // Гаснет кнопка только от своей работы (`_acting`). На чужую — удаление
     // позиции, правку поставщика — не смотрим: раньше она пропадала на время
     // любой, ряд дёргался, и снимок прыгал вправо и обратно.
@@ -551,6 +591,7 @@ class _DocumentDetailsPageState extends State<DocumentDetailsPage> {
     if (detail.umagSupplyId == null &&
         detail.item.status == DocumentStatus.done) {
       return FilledButton.icon(
+        style: compact,
         onPressed: _acting ? null : _check,
         icon: const Icon(LucideIcons.check, size: 18),
         label: const Text('Проверено'),
@@ -561,14 +602,18 @@ class _DocumentDetailsPageState extends State<DocumentDetailsPage> {
     // Вместо этого зовём туда, где она теперь лежит.
     if (detail.umagSupplyId != null) {
       return FilledButton.icon(
+        style: compact,
         onPressed: _openSupply,
         icon: const Icon(LucideIcons.external_link, size: 18),
-        label: const Text('Черновик в UMAG'),
+        // В шапке места мало: рядом стоит заголовок с номером накладной, и
+        // полная подпись выдавливала его в многоточие с середины слова.
+        label: const Text('Черновик'),
       );
     }
 
     if (detail.item.status == DocumentStatus.checked) {
       return FilledButton.icon(
+        style: compact,
         // Пока идёт загрузка, кнопка погашена: черновик в кабинете заводится
         // секунды, и за это время по ней успевали нажать второй раз.
         onPressed: _acting ? null : _sendToUmag,
@@ -579,7 +624,7 @@ class _DocumentDetailsPageState extends State<DocumentDetailsPage> {
                 child: CircularProgressIndicator(strokeWidth: 2),
               )
             : const Icon(LucideIcons.cloud_upload, size: 18),
-        label: Text(_acting ? 'Загружаем…' : 'Загрузить в UMAG'),
+        label: Text(_acting ? 'Загружаем…' : 'В UMAG'),
       );
     }
 
@@ -670,6 +715,11 @@ class _DocumentDetailsPageState extends State<DocumentDetailsPage> {
                           onTap: _saving ? null : _editDate,
                         ),
                         _Row('Позиций', '${detail.lines.length}'),
+                        // Итог переехал сюда из нижней панели: там он занимал
+                        // целую строку экрана ради числа, которое сверяют с
+                        // бумагой один раз, а рядом с номером и датой он и по
+                        // смыслу на своём месте.
+                        _Row('Сумма', formatMoney(detail.item.total)),
                       ],
                     ),
                     _Section(
@@ -721,7 +771,9 @@ class _DocumentDetailsPageState extends State<DocumentDetailsPage> {
                   onAdd: _saving ? null : _addLine,
                 ),
         ),
-        const SizedBox(height: 16),
+        // Место под плавающую полосу: без него последняя позиция и кнопка
+        // «Добавить позицию» прятались бы под ней.
+        const SizedBox(height: 96),
       ],
     );
   }
@@ -785,56 +837,156 @@ class _SectionToggle extends StatelessWidget {
   }
 }
 
-/// Полоса под шапкой с тем, что с накладной делают дальше.
-class _ActionBar extends StatelessWidget {
-  const _ActionBar({required this.child});
+/// Плавающая полоса действий над списком.
+///
+/// Пилюля с иконками, а не панель во всю ширину: она висит поверх документов,
+/// не отрезая от них полосу экрана, и по виду отличается от кнопки действия в
+/// шапке — там следующий шаг накладной, здесь работа с самой бумагой.
+class _Toolbar extends StatelessWidget {
+  const _Toolbar({
+    required this.onRetry,
+    required this.onPhoto,
+    required this.onTotal,
+  });
 
-  final Widget child;
+  /// Пусто — прямо сейчас с накладной уже что-то делают.
+  final VoidCallback? onRetry;
+
+  /// Пусто — снимка нет: у накладных, залитых до того, как мы стали хранить
+  /// оригинал, открывать нечего.
+  final VoidCallback? onPhoto;
+
+  /// Пусто — накладная ещё едет с сервера, показывать нечего.
+  final VoidCallback? onTotal;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFE5E5E5))),
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        // Ряд, а не `Center`: тот занимает всё, что ему дают, — а даёт
+        // `Scaffold` нижней панели целый экран, и панель накрывала список
+        // невидимым слоем, перехватывая нажатия по нему.
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Material(
+              color: accentPale,
+              shape: const StadiumBorder(),
+              clipBehavior: Clip.antiAlias,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _ToolbarButton(
+                      icon: LucideIcons.scan_text,
+                      tooltip: 'Распознать заново',
+                      onPressed: onRetry,
+                    ),
+                    _ToolbarButton(
+                      icon: LucideIcons.image,
+                      tooltip: 'Открыть снимок',
+                      onPressed: onPhoto,
+                    ),
+                    _ToolbarButton(
+                      icon: LucideIcons.info,
+                      tooltip: 'Итог накладной',
+                      onPressed: onTotal,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-      child: child,
     );
   }
 }
 
-/// Нижняя панель: сколько всего по накладной.
-class _BottomBar extends StatelessWidget {
-  const _BottomBar({required this.total});
+/// Кнопка полосы: круглая область нажатия под иконкой.
+class _ToolbarButton extends StatelessWidget {
+  const _ToolbarButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
 
-  final double? total;
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Color(0xFFE5E5E5))),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('Итого', style: TextStyle(color: Color(0xFF737373))),
-              Text(
-                formatMoney(total),
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+    return Tooltip(
+      message: tooltip,
+      child: InkResponse(
+        onTap: onPressed,
+        radius: 28,
+        child: SizedBox(
+          // По ним бьют пальцем на ходу, с накладной в другой руке: мелкая цель
+          // заставляет целиться.
+          width: 60,
+          height: 56,
+          child: Icon(
+            icon,
+            size: 24,
+            color: onPressed == null ? const Color(0xFFA3A3A3) : accentDark,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Итог накладной: сколько всего и из скольких строк.
+class _TotalSheet extends StatelessWidget {
+  const _TotalSheet({required this.total, required this.lines});
+
+  final double? total;
+  final int lines;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Итог накладной',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Сумма', style: TextStyle(color: Color(0xFF737373))),
+                Text(
+                  formatMoney(total),
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Позиций',
+                  style: TextStyle(color: Color(0xFF737373)),
+                ),
+                Text('$lines', style: const TextStyle(fontSize: 16)),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -915,38 +1067,40 @@ class _Row extends StatelessWidget {
                 style: const TextStyle(color: Color(0xFF737373)),
               ),
             ),
-            // Значения по правому краю: подписи слева разной длины, и при
-            // выравнивании по левому значения вставали лесенкой. У правого
-            // края они выстраиваются в столбец, а числа — ещё и разрядами друг
-            // под другом.
+            // Значения по левому краю — ровно на той же вертикали, что и текст
+            // внутри полей ввода рядом: у поля свой внутренний отступ, и без
+            // такого же справка стояла бы на десять точек левее полей.
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    value,
-                    textAlign: TextAlign.right,
-                    style: TextStyle(
-                      color: onTap == null ? color : const Color(0xFF0284C7),
-                      decoration: onTap == null
-                          ? null
-                          : TextDecoration.underline,
-                      decorationColor: const Color(0xFF0284C7),
-                    ),
-                  ),
-                  if (note != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text(
-                        note!,
-                        textAlign: TextAlign.right,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF0284C7),
-                        ),
+              child: Padding(
+                padding: const EdgeInsets.only(left: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      value,
+                      textAlign: TextAlign.left,
+                      style: TextStyle(
+                        color: onTap == null ? color : const Color(0xFF0284C7),
+                        decoration: onTap == null
+                            ? null
+                            : TextDecoration.underline,
+                        decorationColor: const Color(0xFF0284C7),
                       ),
                     ),
-                ],
+                    if (note != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          note!,
+                          textAlign: TextAlign.left,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF0284C7),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
             if (onTap != null)

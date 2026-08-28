@@ -159,7 +159,7 @@ class _DocumentsPageState extends State<DocumentsPage>
   /// выпрямляет перспективу, а модель читает такой снимок заметно лучше. На
   /// телефоне без него — своей камерой, как раньше.
   Future<void> _openCamera() async {
-    const scanner = DocumentScanner();
+    final scanner = DocumentScanner();
     List<Shot> shots;
 
     try {

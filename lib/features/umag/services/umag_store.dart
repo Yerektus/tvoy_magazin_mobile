@@ -77,6 +77,22 @@ class UmagAccountStore extends ChangeNotifier {
     return _categories!;
   }
 
+  /// Товар кабинета по штрихкоду.
+  ///
+  /// Нужен сканеру: код считан, но человек ещё не знает, тот ли это товар.
+  /// Ответ показывают до сохранения строки — сверить название с упаковкой
+  /// проще, чем потом искать пересорт в приёмке.
+  Future<UmagProduct?> product(String barcode) async {
+    try {
+      final body = await _api.get('/umag/products/$barcode/');
+
+      return UmagProduct.fromJson(Map<String, dynamic>.from(body as Map));
+    } on ApiException {
+      // Кабинет не подключён или не ответил — не повод мешать правке строки.
+      return null;
+    }
+  }
+
   /// Вышли из приложения — состояние чужого кабинета помнить незачем.
   void forget() {
     _account = UmagAccount.empty;

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 
 import '../../../shared/services/api_exception.dart';
+import '../../../shared/widgets/back_label.dart';
 import '../../../shared/widgets/error_dialog.dart';
 import '../../../shared/widgets/inline_field.dart';
 import '../../umag/models/umag_account.dart';
@@ -108,6 +109,38 @@ class _LineDetailsPageState extends State<LineDetailsPage> {
     }
 
     await _edit('barcode', code, numeric: true);
+
+    if (mounted) {
+      await _tellAboutProduct(code);
+    }
+  }
+
+  /// Говорит, что за товар прячется за считанным кодом.
+  ///
+  /// Спрашиваем кабинет сразу: цифры на этикетке человеку ничего не говорят, а
+  /// название — говорит. Увидит чужой товар — поправит на месте, а не будет
+  /// искать пересорт в приёмке.
+  Future<void> _tellAboutProduct(String code) async {
+    final product = await widget.umag.product(code);
+
+    if (product == null || !mounted) {
+      return;
+    }
+
+    final stock = product.stock == null
+        ? ''
+        : ', остаток ${numberForInput(product.stock)} ${product.measure}'
+              .trim();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          product.found
+              ? 'В UMAG: ${product.name}$stock'
+              : 'Такого товара в UMAG нет — заведём при отправке',
+        ),
+      ),
+    );
   }
 
   Future<void> _save(Map<String, dynamic> patch) async {
@@ -155,9 +188,17 @@ class _LineDetailsPageState extends State<LineDetailsPage> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text(
-            'Позиция ${_line.position}',
-            style: const TextStyle(fontSize: 16),
+          titleSpacing: 4,
+          automaticallyImplyLeading: false,
+          title: Row(
+            children: [
+              const BackLabel('Накладная'),
+              const SizedBox(width: 8),
+              Text(
+                'Позиция ${_line.position}',
+                style: const TextStyle(fontSize: 16, color: Color(0xFF737373)),
+              ),
+            ],
           ),
           bottom: _saving
               ? const PreferredSize(
@@ -461,7 +502,14 @@ class _ReadOnly extends StatelessWidget {
               style: const TextStyle(color: Color(0xFF737373)),
             ),
           ),
-          Expanded(child: Text(value)),
+          // Тот же отступ, что у текста внутри полей рядом: без него значение
+          // стоит левее их и выпадает из общего столбца.
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(left: 10),
+              child: Text(value),
+            ),
+          ),
         ],
       ),
     );

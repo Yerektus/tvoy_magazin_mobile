@@ -20,6 +20,32 @@ class UmagCategory {
   final String name;
 }
 
+/// Товар кабинета, найденный по штрихкоду.
+class UmagProduct {
+  const UmagProduct({
+    required this.found,
+    required this.name,
+    required this.measure,
+    required this.stock,
+  });
+
+  factory UmagProduct.fromJson(Map<String, dynamic> json) => UmagProduct(
+    found: (json['found'] ?? false) as bool,
+    name: (json['name'] ?? '') as String,
+    measure: (json['measure'] ?? '') as String,
+    stock: (json['stock'] as num?)?.toDouble(),
+  );
+
+  /// Нашёлся ли товар. Нет — не ошибка: значит новый, заведём при отправке.
+  final bool found;
+
+  final String name;
+  final String measure;
+
+  /// Остаток на полке. Пусто — кабинет его не отдал.
+  final double? stock;
+}
+
 /// Подключение сотрудника к своему кабинету UMAG.
 ///
 /// Токена здесь нет и быть не может: сервер его наружу не отдаёт — это ключ от

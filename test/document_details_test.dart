@@ -212,41 +212,83 @@ void main() {
     expect(find.byType(PhotoPage), findsOneWidget);
   });
 
-  testWidgets('без снимка кнопки нет', (tester) async {
+  testWidgets('без снимка кнопку не нажать', (tester) async {
     await pump(tester, _FakeApi(image: null));
 
-    expect(find.byTooltip('Открыть снимок'), findsNothing);
+    // Кнопка остаётся на месте, но гаснет: убери её — и группа из трёх кнопок
+    // съедет, а человек будет искать, куда делся снимок.
+    final button = tester.widget<InkResponse>(
+      find.ancestor(
+        of: find.byIcon(LucideIcons.image),
+        matching: find.byType(InkResponse),
+      ),
+    );
+
+    expect(button.onTap, isNull);
   });
 
-  testWidgets('снимок открывают из шапки, а действие стоит под ней', (
-    tester,
-  ) async {
+  testWidgets('действие в шапке, а работа с бумагой — внизу', (tester) async {
     await pump(tester, _FakeApi(status: 'done'));
 
     final height =
         tester.view.physicalSize.height / tester.view.devicePixelRatio;
-    final photo = tester.getCenter(find.byTooltip('Открыть снимок'));
     final action = tester.getCenter(find.text('Проверено'));
+    final photo = tester.getCenter(find.byTooltip('Открыть снимок'));
 
-    // Снимок — в самой шапке.
-    expect(photo.dy, lessThan(kToolbarHeight + 40));
+    // Следующий шаг — в шапке: он на экране один, и место у правого края
+    // держат под него.
+    expect(action.dy, lessThan(kToolbarHeight + 20));
 
-    // Действие — сразу под ней, а не внизу экрана: список позиций длинный, и
-    // до кнопки в подвале приходилось долистывать.
-    expect(action.dy, greaterThan(photo.dy));
-    expect(action.dy, lessThan(height / 3));
+    // Перечитать, посмотреть снимок и итог — внизу, одной группой: это про
+    // бумагу, а не про движение накладной дальше.
+    expect(photo.dy, greaterThan(height * 0.8));
+    expect(
+      tester.getCenter(find.byTooltip('Распознать заново')).dy,
+      closeTo(photo.dy, 1),
+    );
+    expect(
+      tester.getCenter(find.byTooltip('Итог накладной')).dy,
+      closeTo(photo.dy, 1),
+    );
   });
 
-  testWidgets('итог стоит внизу, а не в шапке', (tester) async {
+  testWidgets('назад подписано тем, куда вернёт', (tester) async {
     await pump(tester, _FakeApi());
 
+    // Одна стрелка не говорит, куда именно уйдёт человек: позицию открывают из
+    // накладной, а накладную — из списка.
+    expect(find.text('Документы'), findsOneWidget);
+
+    await tester.tap(find.text('Документы'));
+    await tester.pumpAndSettle();
+
+    // Уходить некуда: карточка открыта первой в стопке — но нажатие не должно
+    // ничего ронять.
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('итог показывают отдельным листом', (tester) async {
+    await pump(tester, _FakeApi());
+
+    await tester.tap(find.byTooltip('Итог накладной'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Итог накладной'), findsWidgets);
+    // Сумма и число строк рядом: их и сверяют с бумагой вместе.
+    expect(find.text('17\u00a0086\u00a0₸'), findsWidgets);
+    expect(find.text('Позиций'), findsWidgets);
+  });
+
+  testWidgets('итог стоит в справке о документе', (tester) async {
+    await pump(tester, _FakeApi());
+
+    // Раньше итог занимал целую строку внизу экрана ради числа, которое
+    // сверяют с бумагой один раз. Теперь он рядом с номером и датой.
     final total = find.text('17\u00a0086\u00a0₸');
     expect(total, findsOneWidget);
 
-    // Ниже середины экрана — то есть в нижней панели, а не в AppBar.
-    final height =
-        tester.view.physicalSize.height / tester.view.devicePixelRatio;
-    expect(tester.getCenter(total).dy, greaterThan(height / 2));
+    final number = tester.getCenter(find.text('KBH0425963'));
+    expect(tester.getCenter(total).dy, greaterThan(number.dy));
   });
 
   testWidgets('пока накладная разбирается, страница перечитывает себя', (
@@ -295,7 +337,7 @@ void main() {
 
     expect(find.text('Проверено'), findsWidgets);
     // Отправлять нечего, пока никто не сверил с бумагой.
-    expect(find.text('Загрузить в UMAG'), findsNothing);
+    expect(find.text('В UMAG'), findsNothing);
 
     await tester.tap(find.text('Проверено').last);
     await tester.pumpAndSettle();
@@ -309,9 +351,9 @@ void main() {
     final api = _FakeApi();
     await pump(tester, api);
 
-    expect(find.text('Загрузить в UMAG'), findsOneWidget);
+    expect(find.text('В UMAG'), findsOneWidget);
 
-    await tester.tap(find.text('Загрузить в UMAG'));
+    await tester.tap(find.text('В UMAG'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Загрузить'));
     await tester.pumpAndSettle();
@@ -323,8 +365,8 @@ void main() {
   testWidgets('уже отправленную второй раз не предлагают', (tester) async {
     await pump(tester, _FakeApi(supplyId: 999));
 
-    expect(find.text('Загрузить в UMAG'), findsNothing);
-    expect(find.text('Черновик в UMAG'), findsOneWidget);
+    expect(find.text('В UMAG'), findsNothing);
+    expect(find.text('Черновик'), findsOneWidget);
   });
 
   testWidgets(
@@ -335,7 +377,7 @@ void main() {
       await pump(tester, _FakeApi(status: 'done', supplyId: 999));
 
       expect(find.text('Проверено'), findsNothing);
-      expect(find.text('Черновик в UMAG'), findsOneWidget);
+      expect(find.text('Черновик'), findsOneWidget);
     },
   );
 
@@ -370,7 +412,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('Проверено'), findsNothing);
-    expect(find.text('Загрузить в UMAG'), findsNothing);
+    expect(find.text('В UMAG'), findsNothing);
 
     await tester.pumpWidget(const SizedBox());
     await tester.pump();
@@ -410,7 +452,7 @@ void main() {
     final api = _FakeApi(status: 'checked')..delay = const Duration(seconds: 1);
     await pump(tester, api);
 
-    await tester.tap(find.text('Загрузить в UMAG'));
+    await tester.tap(find.text('В UMAG'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Загрузить').last);
 
@@ -627,7 +669,7 @@ void main() {
       reason: 'подготовка: список должен быть пуст',
     );
 
-    await tester.tap(find.text('Черновик в UMAG'));
+    await tester.tap(find.text('Черновик'));
     await tester.pumpAndSettle();
 
     // Прежде чем собирать адрес, страница спросила кабинет.
@@ -644,27 +686,18 @@ void main() {
     );
   });
 
-  testWidgets('справочные значения прижаты к правому краю', (tester) async {
+  testWidgets('справочные значения стоят одним столбцом', (tester) async {
     await pump(tester, _FakeApi());
 
-    final screen =
-        tester.view.physicalSize.width / tester.view.devicePixelRatio;
+    // Значения начинаются на одной вертикали — там же, где поля ввода рядом:
+    // так вся справка читается одним столбцом, а не двумя разными.
+    final status = tester.getTopLeft(find.text('Проверено'));
+    // В накладной две позиции — столько и написано в справке.
+    final lines = tester.getTopLeft(find.text('2'));
+    final label = tester.getTopLeft(find.text('Позиций'));
 
-    // Подписи слева разной длины, значения должны кончаться на одной вертикали,
-    // а не начинаться лесенкой.
-    final lines = tester.getBottomRight(find.text('Позиций'));
-    final status = tester.getBottomRight(find.text('Проверено'));
-
-    expect(
-      status.dx,
-      greaterThan(screen / 2),
-      reason: 'значения остались слева',
-    );
-    expect(
-      lines.dx,
-      lessThan(status.dx),
-      reason: 'подпись должна стоять слева от значения',
-    );
+    expect(status.dx, closeTo(lines.dx, 1));
+    expect(label.dx, lessThan(lines.dx), reason: 'подпись стоит слева');
   });
 
   testWidgets('номер накладной правится прямо в карточке', (tester) async {
@@ -705,9 +738,10 @@ void main() {
     expect(find.text('свернуть'), findsNothing);
     expect(find.text('развернуть'), findsNothing);
 
-    // Позиции и итог остаются: сворачивается только справочная часть.
+    // Позиции остаются: сворачивается только справочная часть, а вместе с ней
+    // и итог — он теперь стоит там же, рядом с номером и датой.
     expect(find.text('Позиции'), findsOneWidget);
-    expect(find.text('Итого'), findsOneWidget);
+    expect(find.text('Сумма'), findsNothing);
 
     await tester.tap(find.text('Информация'));
     await tester.pumpAndSettle();

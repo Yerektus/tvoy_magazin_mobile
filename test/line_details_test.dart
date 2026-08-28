@@ -27,6 +27,18 @@ class _FakeApi extends ApiClient {
 
   @override
   Future<dynamic> get(String path, {Map<String, String>? query}) async {
+    if (path.startsWith('/umag/products/')) {
+      final barcode = path.split('/')[3];
+
+      return <String, dynamic>{
+        'found': barcode == '4607014822657',
+        'barcode': barcode,
+        'name': 'МОЛ.КОКТЕЛЬ ВАНИЛЬ',
+        'measure': 'шт',
+        'stock': 12,
+      };
+    }
+
     if (path == '/umag/categories/') {
       return <String, dynamic>{
         'categories': [

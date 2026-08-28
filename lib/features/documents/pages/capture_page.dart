@@ -5,6 +5,8 @@ import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:image/image.dart' as img;
 
 import '../../../shared/services/api_exception.dart';
+import '../../../shared/widgets/back_label.dart';
+import '../../../shared/widgets/app_theme.dart';
 import '../../../shared/widgets/error_dialog.dart';
 import '../../../shared/widgets/message.dart';
 import '../models/shot.dart';
@@ -210,7 +212,9 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
         // Белая, как везде в приложении: прозрачная поверх кадра выглядела
         // экраном из чужой программы, а её белая черта — единственным, что
         // отделяет шапку от чёрного.
-        title: const Text('Снимок накладной'),
+        titleSpacing: 4,
+        automaticallyImplyLeading: false,
+        title: const BackLabel('Документы'),
         // Под шапкой тёмный кадр — он отделён и без черты из общей темы.
         // Пустая рамка, а не `null`: `null` означает «взять из темы».
         shape: const Border(),
@@ -458,7 +462,7 @@ class DocumentFrame extends StatelessWidget {
     final padding = MediaQuery.paddingOf(context);
     // Сверху — шапка со статус-баром и небольшой отступ, снизу — весь блок
     // CaptureControls плюс то, что откусывает безопасная зона телефона.
-    final topInset = kToolbarHeight + padding.top + 16;
+    final topInset = appBarHeight + padding.top + 16;
     final bottomInset =
         CaptureControls.height + (padding.bottom < 16 ? 16 : padding.bottom);
 

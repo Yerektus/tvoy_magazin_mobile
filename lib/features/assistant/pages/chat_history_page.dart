@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 
 import '../../../shared/services/api_exception.dart';
+import '../../../shared/widgets/back_label.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
 import '../../../shared/widgets/error_dialog.dart';
 import '../../../shared/widgets/message.dart';
@@ -96,7 +97,11 @@ class _ChatHistoryPageState extends State<ChatHistoryPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('История')),
+      appBar: AppBar(
+        titleSpacing: 4,
+        automaticallyImplyLeading: false,
+        title: const BackLabel('Помощник'),
+      ),
       body: RefreshIndicator(onRefresh: _load, child: _body()),
     );
   }

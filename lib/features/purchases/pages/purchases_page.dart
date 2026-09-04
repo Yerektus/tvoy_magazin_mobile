@@ -44,20 +44,20 @@ class _PurchasesPageState extends State<PurchasesPage> {
   }
 
   /// Пересчёт: сперва спрашиваем период, потом считаем.
-  Future<void> _rebuild() async {
-    final plan = widget.store.plan;
-    final chosen = await askPlanSettings(
-      context,
-      days: plan?.days ?? 30,
-      horizon: plan?.horizon ?? 14,
-    );
+  /// Показывать условия, а не отчёт. Раздел с них и открывается: считать
+  /// заново приходится каждый день, а вчерашний отчёт врёт — ассортимент и
+  /// остатки за сутки поменялись.
+  bool _asking = true;
 
-    if (chosen == null || !mounted) {
-      return;
-    }
+  Future<void> _count(PlanSettings chosen) async {
+    setState(() => _asking = false);
 
     try {
-      await widget.store.rebuild(days: chosen.days, horizon: chosen.horizon);
+      await widget.store.rebuild(
+        days: chosen.days,
+        horizon: chosen.horizon,
+        useStock: chosen.useStock,
+      );
     } on ApiException catch (error) {
       if (mounted) {
         await showErrorDialog(
@@ -84,10 +84,31 @@ class _PurchasesPageState extends State<PurchasesPage> {
               )
             : null,
       ),
-      body: RefreshIndicator(onRefresh: store.load, child: _body()),
-      bottomNavigationBar: plan == null || plan.status != PlanStatus.ready
+      // Условия показываем, только когда есть чем считать: без подключённого
+      // расширения и при неудачной загрузке ползунки — обман.
+      body: _asking && store.isConnected && store.error == null
+          ? PlanSettingsForm(
+              days: plan?.days ?? 30,
+              horizon: plan?.horizon ?? 14,
+              useStock: plan?.useStock ?? true,
+              onCount: _count,
+              // Прошлый отчёт открывается без счёта: перечитать вчерашний
+              // список — не повод ждать минуту и дёргать кабинет.
+              onOpenLast: plan == null || plan.status != PlanStatus.ready
+                  ? null
+                  : () => setState(() => _asking = false),
+              lastCountedAt: plan?.builtAt,
+            )
+          : RefreshIndicator(onRefresh: store.load, child: _body()),
+      bottomNavigationBar:
+          _asking || plan == null || plan.status != PlanStatus.ready
           ? null
-          : _Total(plan: plan, onRebuild: store.isLoading ? null : _rebuild),
+          : _Total(
+              plan: plan,
+              onRebuild: store.isLoading
+                  ? null
+                  : () => setState(() => _asking = true),
+            ),
     );
   }
 
@@ -123,9 +144,9 @@ class _PurchasesPageState extends State<PurchasesPage> {
       return Message(
         icon: LucideIcons.shopping_cart,
         title: 'Плана ещё нет',
-        note: 'Посчитаем, что заканчивается, по продажам из UMAG',
-        onRetry: _rebuild,
-        retryLabel: 'Посчитать',
+        note: 'Задайте условия и посчитайте',
+        onRetry: () => setState(() => _asking = true),
+        retryLabel: 'К условиям',
       );
     }
 
@@ -134,7 +155,7 @@ class _PurchasesPageState extends State<PurchasesPage> {
         icon: LucideIcons.circle_alert,
         title: 'Не удалось посчитать',
         note: plan.error.isEmpty ? null : plan.error,
-        onRetry: _rebuild,
+        onRetry: () => setState(() => _asking = true),
         retryLabel: 'Посчитать заново',
       );
     }
@@ -148,7 +169,7 @@ class _PurchasesPageState extends State<PurchasesPage> {
         icon: LucideIcons.circle_check,
         title: 'Закупать нечего',
         note: 'Остатков хватает на ${plan.horizon} дней вперёд',
-        onRetry: _rebuild,
+        onRetry: () => setState(() => _asking = true),
         retryLabel: 'Посчитать заново',
       );
     }

@@ -22,6 +22,10 @@ class PlanStore extends ChangeNotifier {
   Plan? get plan => _plan;
   bool get isLoading => _loading;
 
+  /// Идёт расчёт: либо мы ждём ответа, либо сервер ещё считает. Уходить из
+  /// раздела в это время — терять минуту работы кабинета.
+  bool get isCounting => _loading || _plan?.status == PlanStatus.building;
+
   /// Подключено ли расширение «Планирование закупов». Подключают его в
   /// веб-кабинете и только владелец с администратором — с телефона нечего и
   /// предлагать, поэтому просто говорим, что оно выключено.
@@ -55,7 +59,7 @@ class PlanStore extends ChangeNotifier {
   }
 
   /// Считает план заново. Прежний сервер удаляет — планов по магазину один.
-  Future<void> rebuild({int? days, int? horizon}) async {
+  Future<void> rebuild({int? days, int? horizon, bool? useStock}) async {
     _loading = true;
     _error = null;
     notifyListeners();
@@ -65,6 +69,7 @@ class PlanStore extends ChangeNotifier {
           await _api.post('/purchases/plan/', {
                 'days': ?days,
                 'horizon': ?horizon,
+                'use_stock': ?useStock,
               })
               as Map<String, dynamic>;
 

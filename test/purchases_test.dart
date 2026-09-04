@@ -84,9 +84,7 @@ void main() {
         theme: platform == null
             ? buildTheme()
             : buildTheme().copyWith(platform: platform),
-        home: PurchasesPage(
-          store: PlanStore(api: api),
-        ),
+        home: PurchasesPage(store: PlanStore(api: api)),
       ),
     );
     await tester.pumpAndSettle();
@@ -94,8 +92,15 @@ void main() {
     return api;
   }
 
+  /// Раздел открывается условиями — до отчёта нужно дойти.
+  Future<void> openReport(WidgetTester tester) async {
+    await tester.tap(find.textContaining('Прошлый отчёт'));
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('готовый план показывает позиции и итог', (tester) async {
     await pump(tester, _FakeApi(plan: _ready()));
+    await openReport(tester);
 
     expect(find.text('Напиток PEPSI-COLA ПЭТ 1.0'), findsOneWidget);
     expect(find.text('Лаваш'), findsOneWidget);
@@ -108,6 +113,7 @@ void main() {
 
   testWidgets('над списком не висит справка о периоде', (tester) async {
     await pump(tester, _FakeApi(plan: _ready()));
+    await openReport(tester);
 
     // Период и время расчёта убраны: их спрашивают раз в кнопке пересчёта, а
     // над каждым открытием плана они висели постоянной полосой.
@@ -119,17 +125,23 @@ void main() {
     tester,
   ) async {
     await pump(tester, _FakeApi(plan: _ready()));
+    await openReport(tester);
 
     // Окончание по числу: «2 дня», но «20 дней».
     expect(find.textContaining('хватит на 2 дня'), findsOneWidget);
     expect(find.textContaining('хватит на 20 дней'), findsOneWidget);
   });
 
-  testWidgets('плана ещё нет — предлагаем посчитать', (tester) async {
+  testWidgets('раздел открывается условиями, а не пустотой', (tester) async {
     await pump(tester, _FakeApi());
 
-    expect(find.text('Плана ещё нет'), findsOneWidget);
+    // Считать заново приходится каждый день: вчерашний отчёт врёт, потому что
+    // остатки и ассортимент за сутки поменялись.
+    expect(find.text('Смотрим продажи за'), findsOneWidget);
+    expect(find.text('Закупаемся на'), findsOneWidget);
     expect(find.text('Посчитать'), findsOneWidget);
+    // Считать ещё не начинали — открывать нечего.
+    expect(find.textContaining('Прошлый отчёт'), findsNothing);
   });
 
   testWidgets('расширение не подключено — считать не предлагаем', (
@@ -138,39 +150,53 @@ void main() {
     await pump(tester, _FakeApi(connected: false));
 
     expect(find.text('Планирование не подключено'), findsOneWidget);
-    // Подключают его в веб-кабинете, кнопка тут всё равно бы отказала.
+    // Подключают его в веб-кабинете: ползунки и кнопка тут всё равно бы
+    // ничего не посчитали.
     expect(find.text('Посчитать'), findsNothing);
+    expect(find.text('Смотрим продажи за'), findsNothing);
   });
 
-  testWidgets('пересчёт спрашивает период и шлёт его на сервер', (
+  testWidgets('пересчёт спрашивает условия и шлёт их на сервер', (
     tester,
   ) async {
     final api = await pump(tester, _FakeApi(plan: _ready()));
 
+    await openReport(tester);
     await tester.tap(find.text('Посчитать заново'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Что посчитать'), findsOneWidget);
+    // Сперва условия, и только потом счёт.
+    expect(find.text('Смотрим продажи за'), findsOneWidget);
+    expect(api.posts, isEmpty);
 
-    await tester.tap(find.text('7 дн.').first);
-    await tester.pumpAndSettle();
     await tester.tap(find.text('Посчитать'));
     await tester.pumpAndSettle();
 
     expect(api.posts, [
-      {'days': 7, 'horizon': 14},
+      {'days': 30, 'horizon': 14, 'use_stock': true},
     ]);
   });
 
-  testWidgets('отказ от пересчёта ничего не отправляет', (tester) async {
+  testWidgets('остаток можно не учитывать', (tester) async {
+    // Перед праздником полку набивают заново, не глядя на то, что на ней есть.
     final api = await pump(tester, _FakeApi(plan: _ready()));
 
-    await tester.tap(find.text('Посчитать заново'));
+    await tester.tap(find.text('Учитывать остаток'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Отмена'));
+    await tester.tap(find.text('Посчитать'));
     await tester.pumpAndSettle();
 
+    expect(api.posts.single, {'days': 30, 'horizon': 14, 'use_stock': false});
+  });
+
+  testWidgets('прошлый отчёт открывается без счёта', (tester) async {
+    final api = await pump(tester, _FakeApi(plan: _ready()));
+
+    await openReport(tester);
+
+    // Перечитать вчерашний список — не повод ждать минуту и дёргать кабинет.
     expect(api.posts, isEmpty);
+    expect(find.text('Лаваш'), findsOneWidget);
   });
 
   testWidgets('закупать нечего — говорим об этом, а не показываем пустоту', (
@@ -181,19 +207,17 @@ void main() {
       ..['total_cost'] = '0.00';
 
     await pump(tester, _FakeApi(plan: empty));
+    await openReport(tester);
 
     expect(find.text('Закупать нечего'), findsOneWidget);
   });
 
-  testWidgets('некруглый срок из плана всё равно отмечен', (tester) async {
-    // План могли посчитать с другого клиента: горизонт 3 дня в готовые
-    // варианты не входит, но терять его нельзя.
+  testWidgets('срок из плана открывается тем же, что и был', (tester) async {
+    // План могли посчитать с другого клиента — условия берём из него, а не с
+    // потолка.
     final odd = _ready()..['horizon'] = 3;
 
     await pump(tester, _FakeApi(plan: odd));
-
-    await tester.tap(find.text('Посчитать заново'));
-    await tester.pumpAndSettle();
 
     expect(find.text('3 дн.'), findsOneWidget);
   });
@@ -202,54 +226,32 @@ void main() {
     final odd = _ready()..['horizon'] = 3;
     final api = await pump(tester, _FakeApi(plan: odd));
 
-    await tester.tap(find.text('Посчитать заново'));
-    await tester.pumpAndSettle();
     await tester.tap(find.text('Посчитать'));
     await tester.pumpAndSettle();
 
     expect(api.posts, [
-      {'days': 30, 'horizon': 3},
+      {'days': 30, 'horizon': 3, 'use_stock': true},
     ]);
   });
 
-  testWidgets('на iOS окно периода родное для системы', (tester) async {
+  testWidgets('условия открываются страницей, а не окном', (tester) async {
+    // Пересчёт ходит в кабинет, удаляет прежний план и считается небыстро —
+    // это не то действие, которое делают в окошке поверх списка.
     await pump(tester, _FakeApi(plan: _ready()), platform: TargetPlatform.iOS);
-
-    await tester.tap(find.text('Посчитать заново'));
-    await tester.pumpAndSettle();
-
-    expect(find.byType(CupertinoAlertDialog), findsOneWidget);
-    // Кнопки тоже: адаптивным бывает само окно, а содержимое ему безразлично.
-    expect(
-      find.widgetWithText(CupertinoDialogAction, 'Посчитать'),
-      findsOneWidget,
-    );
-    expect(find.widgetWithText(TextButton, 'Посчитать'), findsNothing);
-  });
-
-  testWidgets('на Android окно периода материальное', (tester) async {
-    await pump(
-      tester,
-      _FakeApi(plan: _ready()),
-      platform: TargetPlatform.android,
-    );
-
-    await tester.tap(find.text('Посчитать заново'));
-    await tester.pumpAndSettle();
 
     expect(find.byType(CupertinoAlertDialog), findsNothing);
-    expect(find.widgetWithText(TextButton, 'Посчитать'), findsOneWidget);
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.text('Смотрим продажи за'), findsOneWidget);
+    expect(find.text('Учитывать остаток'), findsOneWidget);
   });
 
-  testWidgets('на iOS сроки внутри окна не падают', (tester) async {
-    // `CupertinoAlertDialog` не даёт `Material`, и «таблетки» внутри него
-    // валятся с «No Material widget found». Проверка сторожит обёртку.
+  testWidgets('на iOS условия рисуются так же, как на андроиде', (
+    tester,
+  ) async {
     await pump(tester, _FakeApi(plan: _ready()), platform: TargetPlatform.iOS);
-
-    await tester.tap(find.text('Посчитать заново'));
-    await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
     expect(find.text('30 дн.'), findsWidgets);
+    expect(find.byType(Slider), findsNWidgets(2));
   });
 }

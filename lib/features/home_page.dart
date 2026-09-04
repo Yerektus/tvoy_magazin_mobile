@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../shared/widgets/app_nav.dart';
+import '../shared/widgets/confirm_dialog.dart';
 import 'assistant/pages/assistant_page.dart';
 import 'assistant/services/assistant_store.dart';
 import 'auth/services/auth.dart';
@@ -57,6 +58,29 @@ class _HomePageState extends State<HomePage> {
     ];
   }
 
+  /// Уходим в другой раздел.
+  ///
+  /// Пока считается план закупа, спрашиваем: расчёт идёт минуту, ходит в
+  /// кабинет за товарным отчётом и обрывается вместе с уходом — вернувшись,
+  /// человек нашёл бы пустой раздел и начал заново.
+  Future<void> _select(Section section) async {
+    if (_section == Section.purchases && widget.plans.isCounting) {
+      final agreed = await confirm(
+        context,
+        title: 'Прервать расчёт?',
+        message: 'Закуп ещё считается. Уйдёте — придётся считать заново.',
+        action: 'Уйти',
+        dangerous: true,
+      );
+
+      if (!agreed || !mounted) {
+        return;
+      }
+    }
+
+    setState(() => _section = section);
+  }
+
   @override
   Widget build(BuildContext context) {
     // Под клавиатурой панель прячем. Иначе в «Помощнике» она встаёт полосой
@@ -86,7 +110,7 @@ class _HomePageState extends State<HomePage> {
           : AppBottomBar(
               sections: sections,
               current: current,
-              onSelect: (section) => setState(() => _section = section),
+              onSelect: _select,
             ),
     );
   }

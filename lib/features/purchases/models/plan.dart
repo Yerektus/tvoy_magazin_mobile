@@ -86,6 +86,7 @@ class Plan {
     required this.storeName,
     required this.days,
     required this.horizon,
+    required this.useStock,
     required this.itemsTotal,
     required this.totalCost,
     required this.builtAt,
@@ -99,6 +100,7 @@ class Plan {
     storeName: (json['store_name'] ?? '') as String,
     days: (json['days'] ?? 30) as int,
     horizon: (json['horizon'] ?? 14) as int,
+    useStock: (json['use_stock'] ?? true) as bool,
     itemsTotal: (json['items_total'] ?? 0) as int,
     totalCost: _number(json['total_cost']),
     builtAt: json['built_at'] == null
@@ -119,6 +121,9 @@ class Plan {
 
   /// На сколько дней вперёд закупаемся.
   final int horizon;
+
+  /// Вычитали ли из потребности то, что уже лежит на полке.
+  final bool useStock;
 
   final int itemsTotal;
   final double? totalCost;

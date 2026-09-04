@@ -1,157 +1,213 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 
-/// За какой период смотрим продажи и на сколько дней закупаемся.
+import '../../../shared/widgets/app_theme.dart';
+import '../../documents/models/document.dart' show formatDateTime;
+
+/// Что считать: за какой период смотрим продажи, на сколько закупаемся и брать
+/// ли в расчёт то, что уже лежит на полке.
 class PlanSettings {
-  const PlanSettings({required this.days, required this.horizon});
+  const PlanSettings({
+    required this.days,
+    required this.horizon,
+    required this.useStock,
+  });
 
   final int days;
   final int horizon;
+  final bool useStock;
 }
 
-/// Спрашивает период перед пересчётом.
+/// Условия анализа — с них начинается раздел закупок.
 ///
-/// Окно и кнопки берут оформление у платформы, как и остальные окна
-/// приложения. Сами сроки остаются материальными «таблетками»: у Cupertino
-/// такого элемента нет, а городить под iOS барабан ради двух чисел — менять
-/// понятное на непривычное.
-///
-/// Спрашиваем каждый раз, а не считаем молча по прошлым числам: пересчёт ходит
-/// в кабинет и удаляет прежний план, так что это не то действие, которое стоит
-/// делать по одному нажатию.
-///
-/// Границы те же, что у сервера: дольше трёх месяцев смотреть бессмысленно —
-/// ассортимент за это время меняется.
-Future<PlanSettings?> askPlanSettings(
-  BuildContext context, {
-  required int days,
-  required int horizon,
-}) {
-  return showAdaptiveDialog<PlanSettings>(
-    context: context,
-    builder: (context) => _SettingsDialog(days: days, horizon: horizon),
-  );
-}
-
-class _SettingsDialog extends StatefulWidget {
-  const _SettingsDialog({required this.days, required this.horizon});
+/// Не окно поверх списка и не отдельный экран: пересчёт ходит в кабинет за
+/// товарным отчётом, стирает прежний план и считается небыстро, так что это и
+/// есть первый шаг работы. Человек видит все три условия сразу и только потом
+/// получает отчёт.
+class PlanSettingsForm extends StatefulWidget {
+  const PlanSettingsForm({
+    super.key,
+    required this.days,
+    required this.horizon,
+    required this.useStock,
+    required this.onCount,
+    this.onOpenLast,
+    this.lastCountedAt,
+  });
 
   final int days;
   final int horizon;
+  final bool useStock;
+
+  /// Условия заданы — считаем.
+  final ValueChanged<PlanSettings> onCount;
+
+  /// Открыть прошлый отчёт, не считая заново. Пусто — считать ещё не начинали.
+  final VoidCallback? onOpenLast;
+
+  /// Когда посчитали в прошлый раз.
+  final DateTime? lastCountedAt;
 
   @override
-  State<_SettingsDialog> createState() => _SettingsDialogState();
+  State<PlanSettingsForm> createState() => _PlanSettingsFormState();
 }
 
-class _SettingsDialogState extends State<_SettingsDialog> {
-  late int _days = widget.days;
-  late int _horizon = widget.horizon;
+class _PlanSettingsFormState extends State<PlanSettingsForm> {
+  late double _days = widget.days.toDouble();
+  late double _horizon = widget.horizon.toDouble();
+  late bool _useStock = widget.useStock;
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog.adaptive(
-      title: const Text('Что посчитать'),
-      // Обёртка обязательна: на iOS окно рисует `CupertinoAlertDialog`, а он
-      // не даёт `Material` — и «таблетки» внутри падают с «No Material widget
-      // found». Прозрачный `Material` их чинит, ничего не закрашивая.
-      content: Material(
-        type: MaterialType.transparency,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _Choice(
-              label: 'Смотрим продажи за',
-              value: _days,
-              options: const [7, 14, 30, 60, 90],
-              onChanged: (value) => setState(() => _days = value),
-            ),
-            const SizedBox(height: 16),
-            _Choice(
-              label: 'Закупаемся на',
-              value: _horizon,
-              options: const [7, 14, 21, 30, 60],
-              onChanged: (value) => setState(() => _horizon = value),
-            ),
-          ],
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      children: [
+        _Slider(
+          label: 'Смотрим продажи за',
+          value: _days,
+          // Границы те же, что у сервера: дольше трёх месяцев смотреть
+          // бессмысленно — ассортимент за это время меняется.
+          min: 7,
+          max: 90,
+          note:
+              'Чем длиннее период, тем ровнее средний расход. Короткий '
+              'быстрее замечает новинки и сезон.',
+          onChanged: (value) => setState(() => _days = value),
         ),
-      ),
-      actions: [
-        _Action(label: 'Отмена', onPressed: () => Navigator.of(context).pop()),
-        _Action(
-          label: 'Посчитать',
-          onPressed: () => Navigator.of(
-            context,
-          ).pop(PlanSettings(days: _days, horizon: _horizon)),
+        const SizedBox(height: 24),
+        _Slider(
+          label: 'Закупаемся на',
+          value: _horizon,
+          min: 1,
+          max: 60,
+          note: 'На сколько дней вперёд должно хватить заказа.',
+          onChanged: (value) => setState(() => _horizon = value),
         ),
+        const SizedBox(height: 8),
+        _Stock(
+          value: _useStock,
+          onChanged: (value) => setState(() => _useStock = value),
+        ),
+        const SizedBox(height: 24),
+        FilledButton.icon(
+          onPressed: () => widget.onCount(
+            PlanSettings(
+              days: _days.round(),
+              horizon: _horizon.round(),
+              useStock: _useStock,
+            ),
+          ),
+          icon: const Icon(LucideIcons.calculator, size: 18),
+          label: const Text('Посчитать'),
+        ),
+
+        // Прошлый отчёт никуда не делся: считать заново ради того, чтобы его
+        // перечитать, — это лишняя ходка в кабинет и минута ожидания.
+        if (widget.onOpenLast != null) ...[
+          const SizedBox(height: 12),
+          TextButton.icon(
+            onPressed: widget.onOpenLast,
+            icon: const Icon(LucideIcons.file_text, size: 18),
+            label: Text(
+              widget.lastCountedAt == null
+                  ? 'Открыть прошлый отчёт'
+                  : 'Прошлый отчёт от ${formatDateTime(widget.lastCountedAt!)}',
+            ),
+          ),
+        ],
       ],
     );
   }
 }
 
-/// Кнопка окна: на iOS это `CupertinoDialogAction`, иначе обычная.
-///
-/// `AlertDialog.adaptive` подменяет само окно, но не то, что внутри: положи
-/// сюда `TextButton` — на iOS он и останется, с чужими отступами и без
-/// разделителей между кнопками.
-class _Action extends StatelessWidget {
-  const _Action({required this.label, required this.onPressed});
-
-  final String label;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = Text(label);
-
-    return switch (Theme.of(context).platform) {
-      TargetPlatform.iOS || TargetPlatform.macOS => CupertinoDialogAction(
-        onPressed: onPressed,
-        child: text,
-      ),
-      _ => TextButton(onPressed: onPressed, child: text),
-    };
-  }
-}
-
-/// Выбор из нескольких сроков. Готовые варианты вместо поля ввода: числа тут
-/// круглые, а клавиатура на телефоне закрывает пол-окна.
-///
-/// Нынешнее значение добавляется к вариантам, даже если оно не круглое: план
-/// могли посчитать с другого клиента, и без этого текущий срок просто не был
-/// бы отмечен — а нажав «Посчитать», человек молча сменил бы его.
-class _Choice extends StatelessWidget {
-  const _Choice({
+/// Срок в днях: подпись, число и сам ползунок.
+class _Slider extends StatelessWidget {
+  const _Slider({
     required this.label,
     required this.value,
-    required this.options,
+    required this.min,
+    required this.max,
+    required this.note,
     required this.onChanged,
   });
 
   final String label;
-  final int value;
-  final List<int> options;
-  final ValueChanged<int> onChanged;
+  final double value;
+  final double min;
+  final double max;
+  final String note;
+  final ValueChanged<double> onChanged;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(color: Color(0xFF737373))),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
+        Row(
           children: [
-            for (final option in {...options, value}.toList()..sort())
-              ChoiceChip(
-                label: Text('$option дн.'),
-                selected: option == value,
-                onSelected: (_) => onChanged(option),
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
+            ),
+            Text(
+              '${value.round()} дн.',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: accentDark,
+              ),
+            ),
           ],
         ),
+        Slider(
+          // Новый вид ползунка: толстая дорожка, зазор у бегунка и засечка на
+          // конце. Старый рисовал тонкую линию с кружком — на неё труднее
+          // попасть пальцем, а разница между «30» и «60» читалась хуже.
+          // ignore: deprecated_member_use — флаг и нужен, чтобы отключить вид 2023 года
+          year2023: false,
+          value: value,
+          min: min,
+          max: max,
+          divisions: (max - min).round(),
+          onChanged: onChanged,
+        ),
+        Text(
+          note,
+          style: const TextStyle(fontSize: 13, color: Color(0xFF737373)),
+        ),
       ],
+    );
+  }
+}
+
+/// Брать ли в расчёт остаток на полке.
+class _Stock extends StatelessWidget {
+  const _Stock({required this.value, required this.onChanged});
+
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SwitchListTile(
+      value: value,
+      onChanged: onChanged,
+      contentPadding: EdgeInsets.zero,
+      title: const Text(
+        'Учитывать остаток',
+        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+      ),
+      subtitle: Text(
+        value
+            ? 'Из потребности вычтем то, что уже лежит на полке.'
+            : 'Закажем весь запас заново, не глядя на полку.',
+        style: const TextStyle(fontSize: 13, color: Color(0xFF737373)),
+      ),
     );
   }
 }

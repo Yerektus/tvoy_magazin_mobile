@@ -32,11 +32,21 @@ class DocumentsStore extends ChangeNotifier {
   List<DocumentItem> _items = const [];
   DocumentsTab _tab = DocumentsTab.all;
   bool _loading = false;
+  bool? _connected;
   String? _error;
 
   List<DocumentItem> get items => _items;
   DocumentsTab get tab => _tab;
   bool get isLoading => _loading;
+
+  /// Подключено ли расширение «Распознавание документов». Подключают его в
+  /// веб-кабинете и только владелец с администратором — с телефона нечего и
+  /// предлагать, поэтому просто говорим, что оно выключено.
+  bool get isConnected => _connected == true;
+
+  /// Ещё не спрашивали сервер: раздел в панели держим, пока не узнаем.
+  bool get connectionUnknown => _connected == null;
+
   String? get error => _error;
 
   Future<void> select(DocumentsTab tab) async {
@@ -200,6 +210,10 @@ class DocumentsStore extends ChangeNotifier {
     notifyListeners();
 
     try {
+      final access =
+          await _api.get('/invoices/access/') as Map<String, dynamic>;
+      _connected = (access['connected'] ?? false) as bool;
+
       final body =
           await _api.get(
                 '/invoices/',

@@ -12,10 +12,15 @@ import 'package:tvoy_magazin_mobile/shared/widgets/app_theme.dart';
 
 /// Подменяет сеть: отдаёт человека с заданными доступами и пустые списки.
 class _FakeApi extends ApiClient {
-  _FakeApi({required this.purchases, required this.assistant});
+  _FakeApi({
+    required this.purchases,
+    required this.assistant,
+    this.recognition = true,
+  });
 
   final bool purchases;
   final bool assistant;
+  final bool recognition;
 
   /// Сервер считает не мгновенно — иначе состояния «идёт расчёт» не застать.
   @override
@@ -58,6 +63,10 @@ class _FakeApi extends ApiClient {
       return <String, dynamic>{'connected': true};
     }
 
+    if (path == '/invoices/access/') {
+      return <String, dynamic>{'connected': recognition};
+    }
+
     // Плана ещё нет — сервер отвечает пустотой.
     if (path == '/purchases/plan/') {
       return null;
@@ -75,8 +84,13 @@ void main() {
     WidgetTester tester, {
     required bool purchases,
     required bool assistant,
+    bool recognition = true,
   }) async {
-    final api = _FakeApi(purchases: purchases, assistant: assistant);
+    final api = _FakeApi(
+      purchases: purchases,
+      assistant: assistant,
+      recognition: recognition,
+    );
     final auth = Auth(api: api);
     await auth.reload();
 
@@ -102,6 +116,13 @@ void main() {
 
     expect(find.text('Закупки'), findsNothing);
     expect(find.text('Помощник'), findsNothing);
+    expect(find.text('Настройки'), findsOneWidget);
+  });
+
+  testWidgets('без распознавания документов в панели нет', (tester) async {
+    await pump(tester, purchases: false, assistant: false, recognition: false);
+
+    expect(find.text('Документы'), findsNothing);
     expect(find.text('Настройки'), findsOneWidget);
   });
 

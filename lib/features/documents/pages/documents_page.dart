@@ -32,11 +32,10 @@ class _DocumentsPageState extends State<DocumentsPage>
     with SingleTickerProviderStateMixin {
   /// Вкладки ведёт `TabController`: он плавно возит подчёркивание и держит
   /// выбранную, а самодельная полоса делала это руками и хуже.
-  late final TabController _tabs = TabController(
-    length: DocumentsTab.values.length,
-    initialIndex: DocumentsTab.values.indexOf(widget.store.tab),
-    vsync: this,
-  )..addListener(_onTabChanged);
+  ///
+  /// Создаём в `initState`, а не лениво: иначе при пустом экране без вкладок
+  /// контроллер впервые трогают уже в `dispose`, когда предков смотреть нельзя.
+  late final TabController _tabs;
 
   /// Гуляет отдельно от `store.isLoading`: тот про список, а не про то, что
   /// прямо сейчас грузится фото из галереи.
@@ -50,6 +49,11 @@ class _DocumentsPageState extends State<DocumentsPage>
   @override
   void initState() {
     super.initState();
+    _tabs = TabController(
+      length: DocumentsTab.values.length,
+      initialIndex: DocumentsTab.values.indexOf(widget.store.tab),
+      vsync: this,
+    )..addListener(_onTabChanged);
     widget.store.addListener(_onChanged);
     widget.store.load();
     // Список магазинов UMAG нужен не настройкам, а ссылке на черновик
@@ -301,22 +305,26 @@ class _DocumentsPageState extends State<DocumentsPage>
         // пустой полосы.
         title: const Text('Документы'),
         shape: const Border(),
-        bottom: _Tabs(controller: _tabs),
+        bottom: store.isConnected || store.items.isNotEmpty
+            ? _Tabs(controller: _tabs)
+            : null,
       ),
       body: RefreshIndicator(onRefresh: store.load, child: _body(store)),
-      floatingActionButton: FloatingActionButton(
-        key: _fabKey,
-        heroTag: 'add',
-        onPressed: _uploading ? null : _openDial,
-        tooltip: 'Добавить накладную',
-        child: _uploading
-            ? const SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(strokeWidth: 2.5),
-              )
-            : const Icon(LucideIcons.plus),
-      ),
+      floatingActionButton: store.isConnected
+          ? FloatingActionButton(
+              key: _fabKey,
+              heroTag: 'add',
+              onPressed: _uploading ? null : _openDial,
+              tooltip: 'Добавить накладную',
+              child: _uploading
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2.5),
+                    )
+                  : const Icon(LucideIcons.plus),
+            )
+          : null,
     );
   }
 
@@ -332,6 +340,20 @@ class _DocumentsPageState extends State<DocumentsPage>
           title: 'Не удалось загрузить',
           note: store.error,
           onRetry: store.load,
+        ),
+      );
+    }
+
+    // Расширение подключают в веб-кабинете, и только владелец с
+    // администратором. Предлагать кнопку, которая всё равно откажет, незачем.
+    // Уже загруженные накладные не прячем: отключение не должно забирать то,
+    // что смена уже приняла.
+    if (!store.isConnected && store.items.isEmpty) {
+      return _scrollable(
+        const Message(
+          icon: LucideIcons.scan_text,
+          title: 'Распознавание не подключено',
+          note: 'Включите расширение «Распознавание документов» в веб-кабинете',
         ),
       );
     }

@@ -10,6 +10,9 @@ import 'package:tvoy_magazin_mobile/shared/widgets/app_theme.dart';
 
 /// Помнит, с каким отбором просили список, и отдаёт заданные строки.
 class _FakeApi extends ApiClient {
+  _FakeApi({this.connected = true});
+
+  final bool connected;
   final List<String?> asked = [];
   final List<String> deletes = [];
 
@@ -17,11 +20,15 @@ class _FakeApi extends ApiClient {
 
   @override
   Future<dynamic> get(String path, {Map<String, String>? query}) async {
+    if (path == '/invoices/access/') {
+      return <String, dynamic>{'connected': connected};
+    }
+
     if (path == '/invoices/') {
       asked.add(query?['tab']);
     }
 
-    return <String, dynamic>{'results': results, 'connected': false};
+    return <String, dynamic>{'results': results};
   }
 
   /// Удалённая накладная уходит из выдачи — как и на сервере, где она не
@@ -40,8 +47,8 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  Future<_FakeApi> pump(WidgetTester tester) async {
-    final api = _FakeApi();
+  Future<_FakeApi> pump(WidgetTester tester, {_FakeApi? api}) async {
+    api ??= _FakeApi();
 
     await tester.pumpWidget(
       MaterialApp(
@@ -359,5 +366,14 @@ void main() {
 
     expect(api.deletes, isEmpty);
     expect(find.text('ИП СУЛТАН'), findsOneWidget);
+  });
+
+  testWidgets('расширение не подключено — снимать не предлагаем', (
+    tester,
+  ) async {
+    await pump(tester, api: _FakeApi(connected: false));
+
+    expect(find.text('Распознавание не подключено'), findsOneWidget);
+    expect(find.byTooltip('Добавить накладную'), findsNothing);
   });
 }

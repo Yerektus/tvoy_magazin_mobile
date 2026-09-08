@@ -41,21 +41,47 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   Section _section = Section.documents;
 
+  @override
+  void initState() {
+    super.initState();
+    widget.documents.addListener(_onChanged);
+    // От него зависит, есть ли «Документы» в панели: без запроса раздел
+    // появился бы у всех, хотя расширение ещё не подключали.
+    widget.documents.load();
+  }
+
+  @override
+  void dispose() {
+    widget.documents.removeListener(_onChanged);
+    super.dispose();
+  }
+
   /// Разделы, открытые этому человеку.
   ///
-  /// Закупки и помощник менеджеру закрыты: он принимает товар, а не считает
-  /// закуп и не спрашивает аналитику. Кому нужны — доступ выдают руками в
-  /// админке, и сервер говорит об этом в `/auth/me/`. Правило считаем не по
-  /// роли: оно целиком на той стороне, а здесь только ответ.
+  /// Документы — это расширение: без подключения раздела в панели нет, как
+  /// у закупок. Закупки и помощник менеджеру закрыты, пока доступ не выдали
+  /// руками в админке. Правило считаем не по роли: оно целиком на сервере,
+  /// а здесь только ответ `/auth/me/`.
   List<Section> get _sections {
     final user = widget.auth.user;
 
     return [
-      Section.documents,
+      if (widget.documents.isConnected || widget.documents.connectionUnknown)
+        Section.documents,
       if (user?.usesPurchases ?? false) Section.purchases,
       if (user?.usesAssistant ?? false) Section.assistant,
       Section.settings,
     ];
+  }
+
+  void _onChanged() {
+    // Список документов сам себя перечитывает в `initState` — уведомление
+    // приходит, пока HomePage ещё строится. `setState` откладываем на кадр.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        setState(() {});
+      }
+    });
   }
 
   /// Уходим в другой раздел.
@@ -92,8 +118,8 @@ class _HomePageState extends State<HomePage> {
     final sections = _sections;
 
     // Доступ могли отобрать, пока раздел был открыт: возвращаемся к тому, что
-    // есть у всех.
-    final current = sections.contains(_section) ? _section : Section.documents;
+    // ещё есть в панели. Настройки есть всегда.
+    final current = sections.contains(_section) ? _section : sections.first;
 
     return Scaffold(
       body: switch (current) {
@@ -105,7 +131,7 @@ class _HomePageState extends State<HomePage> {
         Section.assistant => AssistantPage(store: widget.chat),
         Section.settings => SettingsPage(auth: widget.auth, umag: widget.umag),
       },
-      bottomNavigationBar: typing
+      bottomNavigationBar: typing || sections.length < 2
           ? null
           : AppBottomBar(
               sections: sections,

@@ -161,4 +161,10 @@ void main() {
     expect(find.text('Закупки'), findsOneWidget);
     expect(find.text('Помощник'), findsOneWidget);
   });
+
+  test('пустое имя в профиле подписывает вопрос как Вы', () {
+    expect(senderName(null), 'Вы');
+    expect(senderName('  '), 'Вы');
+    expect(senderName('Ержан'), 'Ержан');
+  });
 }

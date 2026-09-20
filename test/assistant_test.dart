@@ -224,6 +224,29 @@ void main() {
     expect(find.text('За месяц 60 накладных.'), findsOneWidget);
     // Подпись ответа — чтобы его не спутать со следующим вопросом.
     expect(find.text('Помощник'), findsNWidgets(2));
+    expect(find.text('Вы'), findsOneWidget);
+    expect(find.text('В'), findsOneWidget);
+  });
+
+  testWidgets('свой вопрос подписывают именем из профиля', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(),
+        home: AssistantPage(
+          store: AssistantStore(api: _FakeApi()),
+          sender: 'Ержан',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'Что по закупкам?');
+    await tester.tap(find.widgetWithText(FilledButton, 'Спросить'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ержан'), findsOneWidget);
+    expect(find.text('Е'), findsOneWidget);
+    expect(find.text('Вы'), findsNothing);
   });
 
   testWidgets('разметку в ответе разбирают, а не показывают значками', (

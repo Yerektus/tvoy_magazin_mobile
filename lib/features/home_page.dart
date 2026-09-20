@@ -128,7 +128,10 @@ class _HomePageState extends State<HomePage> {
           umag: widget.umag,
         ),
         Section.purchases => PurchasesPage(store: widget.plans),
-        Section.assistant => AssistantPage(store: widget.chat),
+        Section.assistant => AssistantPage(
+          store: widget.chat,
+          sender: senderName(widget.auth.user?.name),
+        ),
         Section.settings => SettingsPage(auth: widget.auth, umag: widget.umag),
       },
       bottomNavigationBar: typing || sections.length < 2
@@ -140,4 +143,11 @@ class _HomePageState extends State<HomePage> {
             ),
     );
   }
+}
+
+/// Имя над своим вопросом. В профиле пусто — тогда просто «Вы».
+String senderName(String? name) {
+  final trimmed = name?.trim() ?? '';
+
+  return trimmed.isEmpty ? 'Вы' : trimmed;
 }

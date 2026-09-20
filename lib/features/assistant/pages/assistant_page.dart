@@ -26,9 +26,12 @@ const _starters = [
 /// Разговоров у человека много, и открыт всегда один: прошлые лежат в истории
 /// и оттуда же продолжаются.
 class AssistantPage extends StatefulWidget {
-  const AssistantPage({super.key, required this.store});
+  const AssistantPage({super.key, required this.store, this.sender = 'Вы'});
 
   final AssistantStore store;
+
+  /// Имя над своим вопросом — как «Помощник» над ответом.
+  final String sender;
 
   @override
   State<AssistantPage> createState() => _AssistantPageState();
@@ -235,6 +238,7 @@ class _AssistantPageState extends State<AssistantPage> {
         return _Bubble(
           key: ValueKey(message.id),
           message: message,
+          sender: widget.sender,
           arrive: message.id == _sendingId || message.id == _arrivingId,
           onPick: last && !message.mine && !store.isThinking
               ? _askPrompt
@@ -271,8 +275,8 @@ class _Empty extends StatelessWidget {
   }
 }
 
-/// Реплика: свой вопрос без пузыря и без аватара; ответ помощника — на серой
-/// подложке с искрой и подписью, во всю ширину.
+/// Реплика: свой вопрос без пузыря, с именем сверху; ответ помощника — на
+/// серой подложке с искрой и подписью, во всю ширину.
 ///
 /// Пузырь у ответа убран не для красоты. Аналитик отвечает таблицами, и в
 /// узкой колонке колонки сжимались так, что «Товар» переносился по слогам.
@@ -286,11 +290,13 @@ class _Bubble extends StatelessWidget {
   const _Bubble({
     super.key,
     required this.message,
+    required this.sender,
     this.onPick,
     this.arrive = false,
   });
 
   final ChatMessage message;
+  final String sender;
 
   /// Есть — это последний ответ, и предложенные вопросы можно нажать.
   final ValueChanged<String>? onPick;
@@ -310,13 +316,20 @@ class _Bubble extends StatelessWidget {
   Widget _mine() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-      child: SelectableText(
-        message.text,
-        style: const TextStyle(
-          color: Color(0xFF171717),
-          fontSize: 14,
-          height: 1.4,
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _SenderLabel(sender),
+          const SizedBox(height: 10),
+          SelectableText(
+            message.text,
+            style: const TextStyle(
+              color: Color(0xFF171717),
+              fontSize: 14,
+              height: 1.4,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -340,7 +353,10 @@ class _Bubble extends StatelessWidget {
             ),
             if (message.file != null) ...[
               const SizedBox(height: 12),
-              _FileCard(url: message.file!, name: message.fileName ?? 'Отчёт.xlsx'),
+              _FileCard(
+                url: message.file!,
+                name: message.fileName ?? 'Отчёт.xlsx',
+              ),
             ],
             if (questions.isNotEmpty) ...[
               const SizedBox(height: 8),
@@ -443,6 +459,70 @@ class _Arrive extends StatelessWidget {
       child: child,
     );
   }
+}
+
+/// Имя отправителя — чтобы свой вопрос не сливался с ответом.
+///
+/// Фотографий у сотрудников пока нет: в кружке одна буква имени. Когда
+/// появится снимок, его кладут в [photo], и буква уступает место.
+class _SenderLabel extends StatelessWidget {
+  const _SenderLabel(this.name, {this.photo});
+
+  final String name;
+  final String? photo;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _SenderAvatar(name: name, photo: photo),
+        const SizedBox(width: 6),
+        Text(
+          name,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF171717),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SenderAvatar extends StatelessWidget {
+  const _SenderAvatar({required this.name, this.photo});
+
+  final String name;
+  final String? photo;
+
+  @override
+  Widget build(BuildContext context) {
+    final url = photo?.trim() ?? '';
+
+    return CircleAvatar(
+      radius: 12,
+      backgroundColor: const Color(0xFFE5E5E5),
+      backgroundImage: url.isEmpty ? null : NetworkImage(url),
+      child: url.isEmpty
+          ? Text(
+              _senderInitial(name),
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF404040),
+                height: 1,
+              ),
+            )
+          : null,
+    );
+  }
+}
+
+String _senderInitial(String name) {
+  final trimmed = name.trim();
+
+  return trimmed.isEmpty ? '—' : trimmed[0].toUpperCase();
 }
 
 /// Искра и имя — чтобы ответ не сливался со следующим вопросом.

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tvoy_magazin_mobile/features/assistant/pages/assistant_page.dart';
 import 'package:tvoy_magazin_mobile/features/assistant/services/assistant_store.dart';
@@ -10,6 +11,9 @@ class _FakeApi extends ApiClient {
   _FakeApi({
     this.history = const [],
     this.answer = 'За месяц 60 накладных.',
+    this.suggestions = const [],
+    this.file,
+    this.fileName,
     this.delay = Duration.zero,
   });
 
@@ -17,6 +21,13 @@ class _FakeApi extends ApiClient {
   final List<Map<String, dynamic>> history;
 
   final String answer;
+
+  /// Следующие вопросы, которые сервер приложил к ответу.
+  final List<String> suggestions;
+
+  /// Excel к ответу — как после «сформируй отчёт».
+  final String? file;
+  final String? fileName;
 
   /// Насколько сервер задумывается. Ноль — мгновенно, и тогда состояния
   /// «аналитик думает» на экране просто не бывает: проверять в нём нечего.
@@ -67,6 +78,9 @@ class _FakeApi extends ApiClient {
           'id': 2,
           'role': 'assistant',
           'text': answer,
+          'suggestions': suggestions,
+          'file': file,
+          'file_name': fileName,
           'created_at': '2026-08-23T10:00:05Z',
         },
       ],
@@ -143,12 +157,55 @@ void main() {
     return api;
   }
 
-  testWidgets('пустая переписка не показывает ничего лишнего', (tester) async {
+  testWidgets('пустая переписка предлагает с чего начать', (tester) async {
     await pump(tester, _FakeApi());
 
-    // Заголовок и подсказка в поле — и всё: примеров вопросов тут нет.
-    expect(find.text('Спросите про магазин'), findsNWidgets(2));
-    expect(find.textContaining('Что заканчивается'), findsNothing);
+    expect(find.text('Спросите про магазин'), findsOneWidget);
+    expect(find.text('Введите свой вопрос...'), findsOneWidget);
+    expect(find.text('Что заканчивается на полке?'), findsOneWidget);
+    expect(find.text('Что продаётся лучше всего?'), findsOneWidget);
+    expect(find.text('Сколько накладных за месяц?'), findsOneWidget);
+  });
+
+  testWidgets('предложенный вопрос уходит как обычный', (tester) async {
+    final api = await pump(tester, _FakeApi());
+
+    await tester.tap(find.text('Что заканчивается на полке?'));
+    await tester.pumpAndSettle();
+
+    expect(api.asked, [
+      {'text': 'Что заканчивается на полке?'},
+    ]);
+    expect(find.text('Что заканчивается на полке?'), findsOneWidget);
+  });
+
+  testWidgets('после ответа предлагают следующие вопросы', (tester) async {
+    await pump(tester, _FakeApi(suggestions: ['Сколько заказать?']));
+
+    await tester.enterText(find.byType(TextField), 'Молоко');
+    await tester.tap(find.widgetWithText(FilledButton, 'Спросить'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Сколько заказать?'), findsOneWidget);
+    expect(find.text('Что заканчивается на полке?'), findsNothing);
+  });
+
+  testWidgets('к ответу с отчётом рисуют карточку файла', (tester) async {
+    await pump(
+      tester,
+      _FakeApi(
+        answer: 'Продажи за 30 дней — 3 000 позиций.',
+        file: 'https://example.test/media/sales.xlsx',
+        fileName: 'Продажи за 30 дн.xlsx',
+      ),
+    );
+
+    await tester.enterText(find.byType(TextField), 'Сформируй отчёт');
+    await tester.tap(find.widgetWithText(FilledButton, 'Спросить'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Продажи за 30 дн.xlsx'), findsOneWidget);
+    expect(find.byIcon(LucideIcons.file_spreadsheet), findsOneWidget);
   });
 
   testWidgets('вопрос уходит на сервер, ответ появляется в переписке', (
@@ -157,7 +214,7 @@ void main() {
     final api = await pump(tester, _FakeApi());
 
     await tester.enterText(find.byType(TextField), 'Что по закупкам?');
-    await tester.tap(find.byTooltip('Спросить'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Спросить'));
     await tester.pumpAndSettle();
 
     expect(api.asked, [
@@ -165,6 +222,8 @@ void main() {
     ]);
     expect(find.text('Что по закупкам?'), findsOneWidget);
     expect(find.text('За месяц 60 накладных.'), findsOneWidget);
+    // Подпись ответа — чтобы его не спутать со следующим вопросом.
+    expect(find.text('Помощник'), findsNWidgets(2));
   });
 
   testWidgets('разметку в ответе разбирают, а не показывают значками', (
@@ -174,7 +233,7 @@ void main() {
     await pump(tester, _FakeApi(answer: report));
 
     await tester.enterText(find.byType(TextField), 'Отчёт');
-    await tester.tap(find.byTooltip('Спросить'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Спросить'));
     await tester.pumpAndSettle();
 
     // Звёздочек и тире на экране быть не должно: это разметка, а не текст.
@@ -196,7 +255,7 @@ void main() {
     await pump(tester, _FakeApi());
 
     await tester.enterText(find.byType(TextField), 'Что с **Pepsi**?');
-    await tester.tap(find.byTooltip('Спросить'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Спросить'));
     await tester.pumpAndSettle();
 
     // Человек пишет вопрос словами: звёздочки в нём — часть названия, а не
@@ -208,22 +267,24 @@ void main() {
     await pump(tester, _FakeApi(delay: const Duration(seconds: 1)));
 
     await tester.enterText(find.byType(TextField), 'Долгий вопрос');
-    await tester.tap(find.byTooltip('Спросить'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Спросить'));
     // Смотрим на середине: ответа ещё нет.
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('Долгий вопрос'), findsOneWidget);
-    expect(find.text('Смотрю данные…'), findsOneWidget);
+    expect(find.text('Помощник пишет ответ...'), findsOneWidget);
 
-    await tester.pumpAndSettle();
+    // Полоса «пишет ответ» закреплена над полем, точки сами играют.
+    // Таймер сервера всё равно нужно докрутить: анимация кадров не двигает.
+    await tester.pump(const Duration(seconds: 1));
   });
 
   testWidgets('пустой вопрос никуда не отправляется', (tester) async {
     final api = await pump(tester, _FakeApi());
 
     await tester.enterText(find.byType(TextField), '   ');
-    await tester.tap(find.byTooltip('Спросить'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Спросить'));
     await tester.pumpAndSettle();
 
     expect(api.asked, isEmpty);
@@ -233,7 +294,7 @@ void main() {
     await pump(tester, _FakeApi());
 
     await tester.enterText(find.byType(TextField), 'Вопрос');
-    await tester.tap(find.byTooltip('Спросить'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Спросить'));
     await tester.pumpAndSettle();
 
     expect(
@@ -268,7 +329,7 @@ void main() {
     expect(api.deleted, isEmpty);
 
     await tester.enterText(find.byType(TextField), 'Новый вопрос');
-    await tester.tap(find.byTooltip('Спросить'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Спросить'));
     await tester.pumpAndSettle();
 
     // Вопрос уходит с пометкой «в новую», иначе сервер дописал бы его в
@@ -282,11 +343,11 @@ void main() {
     final api = await pump(tester, _FakeApi());
 
     await tester.enterText(find.byType(TextField), 'Первый');
-    await tester.tap(find.byTooltip('Спросить'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Спросить'));
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField), 'Второй');
-    await tester.tap(find.byTooltip('Спросить'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Спросить'));
     await tester.pumpAndSettle();
 
     // У второго вопроса уже есть, к чему привязаться: переписка заведена

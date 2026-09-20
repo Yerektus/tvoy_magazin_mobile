@@ -7,7 +7,7 @@ enum DocumentStatus {
   processing(
     'Распознаётся',
     LucideIcons.refresh_cw,
-    Color(0xFF0284C7),
+    Color(0xFF2563EB),
     Color(0xFFE0F2FE),
   ),
   done(

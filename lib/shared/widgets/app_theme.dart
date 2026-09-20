@@ -2,17 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 
-/// Свой цвет приложения — тот же, что в веб-кабинете: там это `sky-500`, и
+/// Свой цвет приложения — тот же, что в веб-кабинете: там это `blue-500`, и
 /// одно действие не должно быть в двух местах разного цвета.
 ///
 /// Оттенка два. Тёмный достаётся мелкому — подчёркиванию вкладки, подписи
 /// открытого раздела: на белом фоне светлый читается плохо. Крупному вроде
 /// кнопок достаётся яркий.
-const Color accent = Color(0xFF0EA5E9);
-const Color accentDark = Color(0xFF0284C7);
+const Color accent = Color(0xFF3B82F6);
+const Color accentDark = Color(0xFF2563EB);
 
 /// Бледный оттенок того же цвета — подложка под выбранным разделом меню.
-const Color accentPale = Color(0xFFF0F9FF);
+const Color accentPale = Color(0xFFEFF6FF);
+
+/// Цвет помощника. В кабинете это `violet-500` у искры в шапке — то же
+/// действие не должно быть синим, как обычные кнопки кабинета.
+const Color assistantAccent = Color(0xFF8B5CF6);
 
 /// Высота шапки. Выше стандартных 56: заголовок и кнопка действия стоят в один
 /// ряд, и на тесной полосе они жались друг к другу.

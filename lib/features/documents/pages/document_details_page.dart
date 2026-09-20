@@ -1080,11 +1080,11 @@ class _Row extends StatelessWidget {
                       value,
                       textAlign: TextAlign.left,
                       style: TextStyle(
-                        color: onTap == null ? color : const Color(0xFF0284C7),
+                        color: onTap == null ? color : const Color(0xFF2563EB),
                         decoration: onTap == null
                             ? null
                             : TextDecoration.underline,
-                        decorationColor: const Color(0xFF0284C7),
+                        decorationColor: const Color(0xFF2563EB),
                       ),
                     ),
                     if (note != null)
@@ -1095,7 +1095,7 @@ class _Row extends StatelessWidget {
                           textAlign: TextAlign.left,
                           style: const TextStyle(
                             fontSize: 12,
-                            color: Color(0xFF0284C7),
+                            color: Color(0xFF2563EB),
                           ),
                         ),
                       ),
@@ -1109,7 +1109,7 @@ class _Row extends StatelessWidget {
                 child: Icon(
                   LucideIcons.external_link,
                   size: 16,
-                  color: Color(0xFF0284C7),
+                  color: Color(0xFF2563EB),
                 ),
               ),
           ],
@@ -1246,7 +1246,7 @@ class _Field extends StatelessWidget {
                       note!,
                       style: const TextStyle(
                         fontSize: 12,
-                        color: Color(0xFF0284C7),
+                        color: Color(0xFF2563EB),
                       ),
                     ),
                   ),
@@ -1428,7 +1428,7 @@ class _LineTile extends StatelessWidget {
                           // Подобранный выделяем цветом: его не было на
                           // бумаге, и глазами по строке он не проверяется.
                           color: line.barcodeAuto
-                              ? const Color(0xFF0284C7)
+                              ? const Color(0xFF2563EB)
                               : const Color(0xFF737373),
                         ),
                       ),

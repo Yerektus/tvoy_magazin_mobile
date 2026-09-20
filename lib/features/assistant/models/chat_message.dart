@@ -5,6 +5,9 @@ class ChatMessage {
     required this.mine,
     required this.text,
     required this.createdAt,
+    this.file,
+    this.fileName,
+    this.suggestions = const [],
   });
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) => ChatMessage(
@@ -14,6 +17,12 @@ class ChatMessage {
     createdAt: DateTime.tryParse(
       (json['created_at'] ?? '') as String,
     )?.toLocal(),
+    file: _link(json['file']),
+    fileName: _name(json['file_name']),
+    suggestions: [
+      for (final item in json['suggestions'] as List? ?? const [])
+        if (item is String && item.trim().isNotEmpty) item.trim(),
+    ],
   );
 
   final int id;
@@ -23,6 +32,31 @@ class ChatMessage {
 
   final String text;
   final DateTime? createdAt;
+
+  /// Excel-отчёт к ответу. У вопроса его нет.
+  final String? file;
+  final String? fileName;
+
+  /// Следующие вопросы к ответу аналитика — их нажимают, а не читают.
+  final List<String> suggestions;
+}
+
+String? _link(Object? value) {
+  if (value is! String) {
+    return null;
+  }
+
+  final link = value.trim();
+  return link.isEmpty ? null : link;
+}
+
+String? _name(Object? value) {
+  if (value is! String) {
+    return null;
+  }
+
+  final name = value.trim();
+  return name.isEmpty ? null : name;
 }
 
 /// Переписка в истории: чем была и когда в ней говорили последний раз.

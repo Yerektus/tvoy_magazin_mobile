@@ -4,7 +4,7 @@ import '../../documents/models/document.dart';
 
 /// Как считается план на сервере.
 enum PlanStatus {
-  building('Считается', Color(0xFF0284C7)),
+  building('Считается', Color(0xFF2563EB)),
   ready('Готов', Color(0xFF059669)),
   failed('Ошибка', Color(0xFFDC2626));
 

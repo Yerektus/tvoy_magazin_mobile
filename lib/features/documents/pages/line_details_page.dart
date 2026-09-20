@@ -229,7 +229,7 @@ class _LineDetailsPageState extends State<LineDetailsPage> {
               suffix: IconButton(
                 onPressed: _saving ? null : _scanBarcode,
                 icon: const Icon(LucideIcons.scan_barcode, size: 20),
-                color: const Color(0xFF0284C7),
+                color: const Color(0xFF2563EB),
                 tooltip: 'Сканировать штрихкод',
               ),
             ),
@@ -468,7 +468,7 @@ class _Field extends StatelessWidget {
                       note!,
                       style: const TextStyle(
                         fontSize: 12,
-                        color: Color(0xFF0284C7),
+                        color: Color(0xFF2563EB),
                       ),
                     ),
                   ),
